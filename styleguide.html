@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reps Style Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .sg-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+  .sg-swatch { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 15px; color: var(--label-2); }
+  .sg-swatch i { display: block; height: 52px; border-radius: 16px; }
+  .sg-swatch b { color: var(--label); font-weight: 600; font-size: 13px; }
+  .sg-type { display: flex; flex-direction: column; gap: 10px; }
+  .sg-type div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .sg-type span.meta { font-size: 12px; color: var(--label-3); white-space: nowrap; }
+  .sg-stage { position: relative; border-radius: var(--r-card); overflow: hidden; background: var(--bg-elev); }
+  .sg-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 14px; }
+  .sg-tiles div { height: 64px; border-radius: 16px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; }
+  .sg-float { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 0 14px; }
+  .sg-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .sg-rules { margin: 0; padding: 0; list-style: none; }
+  .sg-rules li { position: relative; padding: 12px 18px 12px 52px; font-size: 15px; line-height: 20px; }
+  .sg-rules li + li { border-top: 0.5px solid var(--sep); }
+  .sg-rules li .ic { position: absolute; left: 18px; top: 13px; width: 20px; height: 20px; color: var(--accent); }
+  .sg-rules b { display: block; font-size: 17px; line-height: 22px; font-weight: 600; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<header class="navbar" id="nav">
+  <div class="navbar-inner">
+    <div class="nav-leading"></div>
+    <div class="nav-title">Style Guide</div>
+    <div class="nav-trailing">
+      <button class="icon-btn glass glass-interactive" id="themeBtn" aria-label="Toggle light or dark"></button>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-head">
+    <div class="eyebrow">Reps · Design System</div>
+    <h1 class="t-large" style="margin:0">Style Guide</h1>
+    <p class="t-sub sec" style="margin:6px 0 0">iOS 26 Liquid Glass, applied to a home workout tracker. Toggle light and dark with the top-right button. Try the tab bar at the bottom.</p>
+  </div>
+
+  <section class="section">
+    <div class="section-head"><div class="section-title">Rules We Follow</div></div>
+    <ul class="list sg-rules" id="rules"></ul>
+    <p class="footnote">Source: Apple Human Interface Guidelines — Materials, Tab Bars, Sheets, Buttons, Color, and the “Adopting Liquid Glass” article.</p>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div class="section-title">Glass Over Content</div></div>
+    <div class="sg-stage">
+      <div class="sg-tiles" id="tiles"></div>
+      <div class="sg-tiles" id="tiles2"></div>
+      <div class="sg-float" id="floatRow"></div>
+    </div>
+    <p class="footnote">Glass only lives on floating controls. Content cards beneath stay solid, so the glass has something to refract.</p>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div class="section-title">Accent</div></div>
+    <div class="card">
+      <div class="chips" id="accentChips"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div class="section-title">Buttons</div></div>
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <button class="btn btn-filled lg block" id="b1"></button>
+      <div class="sg-row">
+        <button class="btn btn-tinted">Tinted</button>
+        <button class="btn btn-gray">Gray</button>
+        <button class="btn btn-plain">Plain</button>
+        <button class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div class="section-title">Controls</div></div>
+    <div class="list">
+      <div class="row"><div class="grow title">Appearance</div>
+        <div class="segmented" style="--n:3;--i:0;width:210px" id="seg">
+          <span class="seg-thumb"></span>
+          <button class="is-on" data-i="0">System</button><button data-i="1">Light</button><button data-i="2">Dark</button>
+        </div>
+      </div>
+      <div class="row"><div class="grow title">Voice cues</div><button class="switch" role="switch" aria-checked="true" id="sw1" aria-label="Voice cues"></button></div>
+      <div class="row"><div class="grow title">Haptics</div><button class="switch" role="switch" aria-checked="false" id="sw2" aria-label="Haptics"></button></div>
+      <div class="row"><div class="grow"><div class="title">Sets</div><div class="subtitle">Kettlebell Swing</div></div>
+        <div class="value-stepper"><span class="val rounded" id="stepVal">3</span>
+          <div class="stepper"><button id="stepMinus" aria-label="Fewer"></button><i></i><button id="stepPlus" aria-label="More"></button></div>
+        </div>
+      </div>
+    </div>
+    <div class="search-field" id="search"></div>
+    <div class="chips scroll" id="chips"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div class="section-title">Content Layer</div></div>
+    <div class="card hero" id="hero"></div>
+    <div class="widgets" id="widgets"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div class="section-title">Color</div></div>
+    <div class="card"><div class="sg-swatches" id="swatches"></div></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div class="section-title">Type</div></div>
+    <div class="card sg-type">
+      <div><span class="t-large">Large Title</span><span class="meta">34 Bold</span></div>
+      <div><span class="t-title1">Title 1</span><span class="meta">28 Bold</span></div>
+      <div><span class="t-title2">Title 2</span><span class="meta">22 Bold</span></div>
+      <div><span class="t-headline">Headline</span><span class="meta">17 Semibold</span></div>
+      <div><span class="t-body">Body text for instructions</span><span class="meta">17 Regular</span></div>
+      <div><span class="t-foot sec">Footnote and captions</span><span class="meta">13 Regular</span></div>
+      <div><span class="rounded heavy num" style="font-size:64px;line-height:64px">0:45</span><span class="meta">SF Rounded · timers</span></div>
+    </div>
+    <p class="footnote">Uses the system font stack, which renders San Francisco on Apple devices. Timers and metrics use SF Pro Rounded, as in Apple Fitness.</p>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div class="section-title">Sheets &amp; Alerts</div></div>
+    <div class="sg-row">
+      <button class="btn btn-tinted" id="openSheet">Show Day Sheet</button>
+      <button class="btn btn-gray" id="openAlert">Show Alert</button>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar-wrap" aria-label="Tabs">
+  <div class="tabbar glass" role="tablist" id="tabbar" style="--tabs:3">
+    <span class="tab-lens"></span>
+  </div>
+  <button class="tab-search glass glass-interactive" id="searchTab" aria-label="Search exercises"></button>
+</nav>
+
+<div id="layer"></div>
+
+<script type="module">
+import { icon } from './js/icons.js';
+const $ = (s) => document.querySelector(s);
+const root = document.documentElement;
+
+const rules = [
+  ['layers', 'Glass is the control layer', 'Tab bar, toolbar buttons, sheets and workout controls float in Liquid Glass. Content never does.'],
+  ['sparkles', 'Use it sparingly', 'Only the most important functional elements get glass, and glass never stacks on glass.'],
+  ['target', 'Color marks the primary action', 'Accent fills the background of one or two prominent buttons per view. Tab and toolbar icons stay monochrome until selected.'],
+  ['house', 'Tabs navigate, never act', 'Today, Calendar and Plan live in a floating capsule. Search sits apart at the trailing end, as in iOS 26.'],
+  ['chevrons-up-down', 'Sheets inset, then go opaque', 'Half sheets float inset from the screen edge in glass and turn more opaque at full height.'],
+  ['circle-dashed', 'Concentric, rounder shapes', 'Capsule controls, 26pt content cards and 38pt sheets nest inside the rounded display.'],
+  ['sun-moon', 'Light, dark and accessibility', 'System colors adapt in both modes; motion and contrast follow the device settings.'],
+];
+$('#rules').innerHTML = rules.map(([i, t, d]) => `<li>${icon(i)}<b>${t}</b><span class="sec">${d}</span></li>`).join('');
+
+const tileColors = [['--orange','Swing'],['--blue','Squat'],['--green','Row'],['--pink','Press'],['--indigo','Lunge'],['--teal','Plank'],['--red','Burpee'],['--yellow','Carry']];
+$('#tiles').innerHTML = tileColors.slice(0,4).map(([c,t]) => `<div style="background:var(${c})">${t}</div>`).join('');
+$('#tiles2').innerHTML = tileColors.slice(4).map(([c,t]) => `<div style="background:var(${c})">${t}</div>`).join('');
+$('#floatRow').innerHTML = `
+  <button class="icon-btn glass glass-interactive" aria-label="Previous">${icon('skip-back')}</button>
+  <button class="toolbar-pill glass glass-interactive">${icon('pause', 'sm')} Pause</button>
+  <button class="toolbar-pill glass glass-prominent glass-interactive">${icon('play', 'sm')} Start</button>
+  <button class="icon-btn glass glass-interactive" aria-label="Next">${icon('skip-forward')}</button>`;
+
+const accents = [['orange','Orange'],['blue','Blue'],['green','Green'],['red','Red'],['pink','Pink'],['purple','Purple'],['indigo','Indigo'],['mint','Mint']];
+const renderAccents = () => {
+  const cur = root.dataset.accent || 'orange';
+  $('#accentChips').innerHTML = accents.map(([k, n]) => `<button class="chip ${k === cur ? 'is-on' : ''}" data-accent="${k}"><span style="width:12px;height:12px;border-radius:50%;background:var(--${k})"></span>${n}</button>`).join('');
+};
+renderAccents();
+$('#accentChips').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-accent]'); if (!b) return;
+  if (b.dataset.accent === 'orange') delete root.dataset.accent; else root.dataset.accent = b.dataset.accent;
+  renderAccents();
+});
+
+$('#b1').innerHTML = `${icon('play', 'sm')} Start Workout`;
+
+const seg = $('#seg');
+seg.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  seg.style.setProperty('--i', b.dataset.i);
+  seg.querySelectorAll('button').forEach((x) => x.classList.toggle('is-on', x === b));
+  const mode = ['', 'light', 'dark'][+b.dataset.i];
+  if (mode) root.dataset.theme = mode; else delete root.dataset.theme;
+  setThemeIcon();
+});
+document.querySelectorAll('.switch').forEach((s) => s.addEventListener('click', () => s.setAttribute('aria-checked', s.getAttribute('aria-checked') !== 'true')));
+let sets = 3;
+$('#stepMinus').innerHTML = icon('minus'); $('#stepPlus').innerHTML = icon('plus');
+$('#stepMinus').onclick = () => { sets = Math.max(1, sets - 1); $('#stepVal').textContent = sets; };
+$('#stepPlus').onclick = () => { sets = Math.min(10, sets + 1); $('#stepVal').textContent = sets; };
+$('#search').innerHTML = `${icon('search', 'sm')}<input type="search" id="q" placeholder="Search exercises" aria-label="Search exercises">`;
+const chipNames = ['All', 'Kettlebell', 'Dumbbells', 'Bodyweight', 'Bands', 'Jump Rope', 'Core'];
+$('#chips').innerHTML = chipNames.map((n, i) => `<button class="chip ${i === 1 ? 'is-on' : ''}">${n}</button>`).join('');
+$('#chips').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; $('#chips').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-on', c === b)); });
+
+const ex = [['Kettlebell Swing', '4 × 15'], ['Goblet Squat', '3 × 10'], ['Single-Arm Row', '3 × 10 / side'], ['Plank', '3 × 40 s']];
+$('#hero').innerHTML = `
+  <div class="eyebrow accent">Today · Week 2, Day 3</div>
+  <div class="hero-title">Kettlebell · Full Body</div>
+  <div class="hero-meta"><span>${icon('clock')} 35 min</span><span>${icon('list')} 7 exercises</span><span>${icon('flame')} Strength</span></div>
+  <div class="ex-preview">${ex.map(([n, r], i) => `<div class="ex"><div class="ex-badge">${i + 1}</div><div class="name">${n}</div><div class="rx">${r}</div></div>`).join('')}</div>
+  <button class="btn btn-filled lg block">${icon('play', 'sm')} Start Workout</button>
+  <p class="footnote" style="padding:0;margin:0;text-align:center">Example workout for the design preview</p>`;
+
+const C = 2 * Math.PI * 34;
+$('#widgets').innerHTML = `
+  <div class="widget"><div class="widget-head accent">${icon('target')} This Week</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:auto">
+      <svg class="ring" width="76" height="76" viewBox="0 0 76 76"><circle class="track" cx="38" cy="38" r="34" stroke-width="9"/><circle class="val" cx="38" cy="38" r="34" stroke-width="9" stroke="var(--accent)" stroke-dasharray="${C}" stroke-dashoffset="${C * 0.25}"/></svg>
+      <div><div class="widget-value">3<small>/4</small></div><div class="widget-foot" style="margin:0">workouts</div></div>
+    </div></div>
+  <div class="widget"><div class="widget-head" style="color:var(--orange)">${icon('flame')} Streak</div>
+    <div class="widget-value" style="margin-top:auto">12<small>days</small></div><div class="widget-foot" style="margin-top:0">Rest days count</div></div>
+  <div class="widget"><div class="widget-head" style="color:var(--green)">${icon('timer')} Minutes</div>
+    <div class="widget-value">96</div>
+    <div class="mini-bars">${['M','T','W','T','F','S','S'].map((d, i) => { const h = [70, 0, 100, 45, 0, 0, 0][i]; return `<div class="b ${h ? 'on' : ''} ${i === 3 ? 'today' : ''}"><i style="height:${Math.max(8, h)}%"></i><span>${d}</span></div>`; }).join('')}</div></div>
+  <div class="widget"><div class="widget-head" style="color:var(--indigo)">${icon('flag')} Plan</div>
+    <div class="widget-value" style="margin-top:auto">Week 2<small>of 8</small></div>
+    <div class="bar"><i style="width:22%;background:var(--indigo)"></i></div><div class="widget-foot" style="margin-top:0">22% complete</div></div>`;
+
+const sw = [['--accent','Accent'],['--red','Red'],['--orange','Orange'],['--yellow','Yellow'],['--green','Green'],['--mint','Mint'],['--teal','Teal'],['--cyan','Cyan'],['--blue','Blue'],['--indigo','Indigo'],['--purple','Purple'],['--pink','Pink'],['--bg','Background'],['--bg-elev','Card'],['--fill-3','Fill'],['--label-2','Secondary']];
+$('#swatches').innerHTML = sw.map(([v, n]) => `<div class="sg-swatch"><i style="background:var(${v});box-shadow:inset 0 0 0 0.5px var(--sep)"></i><b>${n}</b>${v}</div>`).join('');
+
+// Tab bar
+const tabs = [['house', 'Today'], ['calendar', 'Calendar'], ['clipboard-list', 'Plan']];
+const tabbar = $('#tabbar');
+tabbar.insertAdjacentHTML('beforeend', tabs.map(([i, n], k) => `<button class="tab ${k === 0 ? 'is-active' : ''}" role="tab" data-k="${k}">${icon(i)}<span>${n}</span></button>`).join(''));
+$('#searchTab').innerHTML = icon('search');
+tabbar.addEventListener('click', (e) => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  tabbar.style.setProperty('--tab-i', b.dataset.k);
+  tabbar.querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t === b));
+  $('#searchTab').classList.remove('is-active');
+});
+$('#searchTab').onclick = () => { tabbar.querySelectorAll('.tab').forEach((t) => t.classList.remove('is-active')); $('#searchTab').classList.add('is-active'); };
+
+// Theme button
+const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+function setThemeIcon() { $('#themeBtn').innerHTML = icon(isDark() ? 'sun' : 'moon'); }
+setThemeIcon();
+$('#themeBtn').onclick = () => { root.dataset.theme = isDark() ? 'light' : 'dark'; setThemeIcon(); };
+
+// Scroll edge effect + inline title
+const nav = $('#nav');
+addEventListener('scroll', () => nav.classList.toggle('is-scrolled', scrollY > 40), { passive: true });
+
+// Sheet + alert demos
+const layer = $('#layer');
+$('#openSheet').onclick = () => {
+  layer.innerHTML = `<div class="sheet-layer"><div class="sheet-scrim" data-close></div>
+    <section class="sheet" id="sheet" role="dialog" aria-label="Day details">
+      <div class="sheet-grab" id="grab" title="Tap to resize"></div>
+      <div class="sheet-toolbar">
+        <button class="icon-btn glass glass-interactive" data-close aria-label="Close">${icon('x')}</button>
+        <div class="sheet-title">Tuesday<small>November 3</small></div>
+        <button class="icon-btn glass glass-prominent glass-interactive" data-close aria-label="Mark complete">${icon('check')}</button>
+      </div>
+      <div class="sheet-body">
+        <div class="card hero" style="padding:18px"><div class="eyebrow accent">Planned</div><div class="t-title2">Dumbbell · Upper Body</div>
+          <div class="hero-meta"><span>${icon('clock')} 30 min</span><span>${icon('list')} 6 exercises</span></div></div>
+        <div class="list">${['Floor Press · 3 × 10', 'Bent-Over Row · 3 × 10', 'Arnold Press · 3 × 8', 'Hammer Curl · 2 × 12'].map((t) => `<div class="row"><div class="grow title">${t}</div>${icon('chevron-right', 'chev')}</div>`).join('')}</div>
+      </div>
+    </section></div>`;
+  const L = layer.firstElementChild;
+  requestAnimationFrame(() => requestAnimationFrame(() => L.classList.add('is-open')));
+  $('#grab').onclick = () => $('#sheet').classList.toggle('detent-large');
+  L.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) { L.classList.remove('is-open'); setTimeout(() => (layer.innerHTML = ''), 400); } });
+};
+$('#openAlert').onclick = () => {
+  layer.innerHTML = `<div class="alert-layer"><div class="sheet-scrim" data-close></div>
+    <div class="alert glass" role="alertdialog"><div class="t-headline">End Workout?</div><p>Your progress so far is kept. You can mark the day complete later.</p>
+    <div class="actions"><button class="btn btn-filled" data-close>Keep Going</button><button class="btn btn-danger" data-close>End Workout</button></div></div></div>`;
+  layer.firstElementChild.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) layer.innerHTML = ''; });
+};
+</script>
+</body>
+</html>
