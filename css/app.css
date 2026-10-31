@@ -903,7 +903,7 @@ button.widget:active { transform: scale(0.97); }
 .wizard { display: flex; flex-direction: column; }
 .wiz-top {
   position: sticky; top: 0; z-index: 3;
-  display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 12px;
+  display: grid; grid-template-columns: minmax(44px, auto) 1fr minmax(44px, auto); align-items: center; gap: 12px;
   padding: calc(env(safe-area-inset-top, 0px) + 8px) max(var(--gutter), env(safe-area-inset-right, 0px)) 8px max(var(--gutter), env(safe-area-inset-left, 0px));
 }
 .wiz-dots { display: flex; justify-content: center; gap: 6px; }
