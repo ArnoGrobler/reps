@@ -318,14 +318,13 @@ a { color: var(--accent); text-decoration: none; }
   border-radius: 999px;
   background: var(--lens);
   transform: translateX(calc(var(--tab-i, 0) * 100%));
-  transition: transform 0.55s var(--spring), scale 0.4s var(--spring);
+  transition: transform 0.55s var(--spring);
 }
 .tabbar { touch-action: none; user-select: none; -webkit-user-select: none; }
 .tabbar.no-lens:not(.is-pressing) .tab-lens { opacity: 0; }
 /* Pressed / dragged: the selection lifts into a clear glass bubble under the thumb */
 .tabbar.is-pressing .tab-lens {
   transform: translateX(var(--drag-x, 0px));
-  scale: 1.16 1.36;
   background: rgba(255, 255, 255, 0.28);
   -webkit-backdrop-filter: blur(1.5px) saturate(190%) brightness(1.12);
   backdrop-filter: blur(1.5px) saturate(190%) brightness(1.12);
@@ -334,10 +333,8 @@ a { color: var(--accent); text-decoration: none; }
     inset 1.5px 1.5px 1px -0.5px rgba(255, 255, 255, 0.95),
     inset -1.5px -1.5px 1px -0.5px rgba(255, 255, 255, 0.55),
     inset 0 0 0 0.5px rgba(255, 255, 255, 0.35);
-  transition: transform 0.12s var(--ease-out), scale 0.45s var(--spring), background-color 0.2s, box-shadow 0.2s;
+  transition: transform 0.12s var(--ease-out), background-color 0.2s, box-shadow 0.2s;
 }
-.tabbar.settle .tab-lens { animation: lens-settle 0.55s var(--spring); }
-@keyframes lens-settle { 0% { scale: 1.12 1.28; } 45% { scale: 0.94 1.05; } 100% { scale: 1 1; } }
 .tab.is-hover { color: var(--accent); }
 .tab.is-hover .ic { transform: scale(1.16); }
 .tab {
@@ -1192,3 +1189,20 @@ button.widget:active { transform: scale(0.97); }
 .swipe-action.restore { background: var(--green); }
 .swipe-row.is-hidden .swipe-content .title { color: var(--label-2); }
 .swipe-row.is-hidden .swipe-content .row-icon { opacity: 0.45; }
+
+.option-card.compact { padding: 12px 16px; }
+
+/* Evidence: effort, proven workouts, weekly volume */
+.effort-card { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; text-align: left; }
+.effort-card > .ic { color: var(--accent); margin-top: 1px; }
+.tag.ev-green { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+.tag.ev-blue { background: color-mix(in srgb, var(--blue) 15%, transparent); color: var(--blue); }
+.tag.ev-orange { background: color-mix(in srgb, var(--orange) 16%, transparent); color: var(--orange); }
+.proven-card { width: 210px; gap: 6px; }
+.proven-card .t-foot { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.proven-meta { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--label-2); }
+.volume-card { display: flex; flex-direction: column; gap: 10px; }
+.vol-row { display: grid; grid-template-columns: 110px 1fr 28px; align-items: center; gap: 10px; font-size: 15px; }
+.vol-num { text-align: right; font-weight: 700; }
+.pl-effort { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--label-2); background: var(--fill-4); padding: 4px 10px; border-radius: 999px; }
+.pl-hint { font-size: 14px; line-height: 19px; color: var(--accent); max-width: 320px; }

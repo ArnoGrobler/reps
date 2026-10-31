@@ -5,7 +5,8 @@ A home workout planner and tracker with an iOS 26 Liquid Glass interface. Plain 
 ## What it does
 
 - **Plan wizard.** Choose a goal (strength, balanced, conditioning), level, plan length, small equipment (kettlebell, dumbbells, bands, jump rope, sliders, ab wheel, bodyweight), and minutes for each weekday. Days can differ in length, and a day set to zero becomes a rest day.
-- **Generated plans.** Each workout has a warm-up, a main block (straight sets or circuits), an optional finisher and a cool-down, sized to fit the time you gave. Plans run in 4-week blocks: reps or intervals progress each week, the 4th week is a lighter deload, and exercises rotate each block.
+- **Evidence-based plans.** Sets, reps, rest, effort, warm-ups, weekly volume, progression and deloads follow the 2026 ACSM position stand, systematic reviews and published training studies. Every number and its source is in [docs/programming-evidence.md](docs/programming-evidence.md) (63 references, each checked at PubMed or the publisher). Days of 30 minutes or less use alternating pairs (supersets) to save time; plans run in 4-week blocks with double progression, and intermediate and advanced plans get a lighter 4th week.
+- **Proven workouts.** The 7-Minute Circuit (Klika & Jordan 2013), the 11-minute 5BX session (Archila 2021), Tabata-style 20/10, kettlebell swing intervals (Lake & Lauder 2012), kettlebell snatch 15:15 (Falatic 2015), Simple & Sinister (practitioner programme, labelled as untested) and a minimal-dose strength session. Conditioning days use them automatically, and any day can be swapped for one.
 - **Editing.** Change a day's time, sets, reps, work time and rest. Swap an exercise (optionally in later weeks too), reorder, add or remove exercises, switch a day between workout and rest, or generate a new workout for a day.
 - **Today.** Week strip, the next workout, and widgets for this week, streak (completed rest days count), minutes and plan progress.
 - **Calendar.** Months scroll vertically. Planned workouts are tinted, completed workouts and rest days get a check, and missed workouts get a hollow ring. Tap a day for its details.
@@ -65,7 +66,9 @@ index.html              App entry
 styleguide.html         Liquid Glass component reference
 css/app.css             Design tokens, glass materials, all screens
 js/app.js               Shell, tab routing, event delegation
-js/generator.js         Plan generator, progression, workout flattening
+js/generator.js         Plan generator (evidence-based), progression, workout flattening
+js/data/templates.js    Proven workouts from published studies
+docs/                   programming-evidence.md: sources for every training number
 js/player.js            Workout mode (timed and own pace)
 js/wizard.js            Plan setup flow
 js/store.js             Profiles, per-profile state, local storage

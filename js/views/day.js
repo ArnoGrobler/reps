@@ -7,8 +7,11 @@ import { todayKey, fmtWeekday, fmtMonthDay, relativeLabel, fmtMinutes, dow } fro
 import { getState, update, getDay, isDone, dayStatus, weekIndexOf } from '../store.js';
 import { countExercises, estimateSeconds, regenerateDay, FOCUS } from '../generator.js';
 import { dayEditorView } from './editor.js';
+import { templatePickerView, evidenceTag } from './proven.js';
+import { TEMPLATE } from '../data/templates.js';
 
 export function blockFormat(b) {
+  if (b.pair) return `${b.rounds} set${b.rounds === 1 ? '' : 's'} · alternating`;
   if (b.format === 'circuit') {
     if (b.rounds <= 1) return b.kind === 'warmup' || b.kind === 'cooldown' ? 'Flow' : '1 round';
     return `${b.rounds} rounds${b.roundRest ? ` · ${b.roundRest} s between` : ''}`;
@@ -18,11 +21,14 @@ export function blockFormat(b) {
 
 export function itemRx(it, b) {
   const ex = EX[it.exId];
+  if (it.ramp) return `${it.reps} reps · light ramp-up set`;
+  const range = it.range && it.mode === 'reps' ? ` (range ${it.range[0]}–${it.range[1]})` : '';
+  if (b.pair) return `${it.mode === 'time' ? `${it.duration} s` : `${it.reps} reps`}${ex?.perSide ? ' / side' : ''}${range} · ${it.rest} s between`;
   if (b.format === 'circuit') {
     const amt = it.mode === 'time' ? `${it.duration} s` : `${it.reps} reps`;
-    return `${amt}${ex?.perSide ? ' / side' : ''}${it.rest ? ` · ${it.rest} s rest` : ''}`;
+    return `${amt}${ex?.perSide && !it.oneSide ? ' / side' : ''}${it.rest ? ` · ${it.rest} s ${b.restLabel ? b.restLabel.toLowerCase() : it.rest <= 20 ? 'to switch' : 'rest'}` : ''}`;
   }
-  return `${rxText(it, ex)} · ${it.rest} s rest`;
+  return `${rxText(it, ex)}${range} · ${it.rest} s rest`;
 }
 
 export function blockList(b, { action = 'open-exercise', key = '' } = {}) {
@@ -91,6 +97,8 @@ export function dayView(key) {
             <button class="btn btn-gray sm" data-action="edit-day" data-key="${key}">${icon('pencil', 'xs')} Edit</button>
           </div>
         </div>
+        ${day.effort ? `<div class="card effort-card">${icon('gauge')}<div><div class="t-headline">Effort</div><div class="t-sub sec">${esc(day.effort)}</div></div></div>` : ''}
+        ${(() => { const pid = day.blocks.find((b) => b.protocol)?.protocol; const tpl = pid && TEMPLATE[pid]; return tpl ? `<button class="card effort-card pressable" data-action="open-template" data-tpl="${tpl.id}">${icon('book-open')}<div style="min-width:0;flex:1"><div class="t-headline">${esc(tpl.name)}</div><div class="t-foot sec">${esc(tpl.source)}</div><div style="margin-top:6px">${evidenceTag(tpl)}</div></div>${icon('chevron-right', 'chev')}</button>` : ''; })()}
         ${day.blocks.filter((b) => b.items.length).map((b) => blockList(b, { key })).join('')}`;
     },
   };
@@ -148,6 +156,7 @@ export const actions = {
         { label: done ? 'Mark as Not Done' : 'Mark as Done', icon: done ? 'undo-2' : 'circle-check', value: 'done' },
         { label: 'Edit Workout', icon: 'pencil', value: 'edit' },
         { label: 'New Workout for This Day', icon: 'refresh-cw', value: 'regen' },
+        { label: 'Use a Proven Workout', icon: 'book-open', value: 'proven' },
         { sep: true },
         { label: 'Change to Rest Day', icon: 'moon', value: 'rest' },
       ]
@@ -159,6 +168,7 @@ export const actions = {
     if (v === 'done') toggleDone(key);
     else if (v === 'edit') pushSheet(dayEditorView(key));
     else if (v === 'rest') setRestDay(key, true);
+    else if (v === 'proven') pushSheet(templatePickerView(key));
     else if (v === 'workout') setRestDay(key, false);
     else if (v === 'regen') {
       const old = day;

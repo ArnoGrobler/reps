@@ -59,7 +59,7 @@ export function dayEditorView(key) {
           <section class="section">
             <div class="section-head"><div class="section-title">${esc(b.name)}</div><span class="t-foot sec">${esc(blockFormat(b))}</span></div>
             <div class="list">
-              ${b.format === 'circuit' && b.kind !== 'warmup' && b.kind !== 'cooldown' ? `<div class="row"><div class="grow title">Rounds</div>
+              ${b.format === 'circuit' && b.kind !== 'warmup' && b.kind !== 'cooldown' ? `<div class="row"><div class="grow title">${b.pair ? 'Sets' : 'Rounds'}</div>
                 <div class="value-stepper"><span class="val rounded">${b.rounds}</span>${stepperHtml(`ed:rounds:${b.id}`, { canDec: b.rounds > 1, canInc: b.rounds < 10, label: 'rounds' })}</div></div>` : ''}
               ${b.items.map((it) => {
                 const ex = EX[it.exId];
@@ -109,7 +109,7 @@ function itemEditorView() {
         <div class="list">
           <div class="row"><div class="grow title">Measure by</div>
             ${segmented('ed:mode', [{ value: 'reps', label: 'Reps' }, { value: 'time', label: 'Time' }], item.mode, 'width:150px')}</div>
-          ${circuit ? `<div class="row"><div class="grow"><div class="title">Rounds</div><div class="subtitle">Set for the whole circuit</div></div><span class="detail">${block.rounds}</span></div>`
+          ${circuit ? `<div class="row"><div class="grow"><div class="title">${block.pair ? 'Sets' : 'Rounds'}</div><div class="subtitle">${block.pair ? 'Set for the pair' : 'Set for the whole circuit'}</div></div><span class="detail">${block.rounds}</span></div>`
             : `<div class="row"><div class="grow title">Sets</div><div class="value-stepper"><span class="val rounded">${item.sets}</span>${stepperHtml('ed:sets', { canDec: item.sets > 1, canInc: item.sets < 10, label: 'sets' })}</div></div>`}
           ${item.mode === 'reps'
             ? `<div class="row"><div class="grow"><div class="title">Reps</div>${ex?.perSide ? '<div class="subtitle">Each side</div>' : ''}</div><div class="value-stepper"><span class="val rounded">${item.reps}</span>${stepperHtml('ed:reps', { canDec: item.reps > 1, canInc: item.reps < 100, label: 'reps' })}</div></div>`
@@ -249,7 +249,7 @@ export const actions = {
     edit((day) => {
       const b = day.blocks.find((x) => x.id === ctx.blockId);
       const kind = b.kind === 'warmup' || b.kind === 'cooldown' ? b.kind : 'main';
-      const it = makeItem(ex, { goal: s.plan.goal, level: s.plan.level, kind });
+      const it = makeItem(ex, { goal: s.plan.goal, level: s.plan.level, load: s.plan.load || 'moderate', kind });
       if (b.format === 'circuit' && kind === 'main' && b.items[0]) {
         it.mode = 'time'; it.duration = b.items[0].duration; it.rest = b.items[0].rest; it.sets = 1;
       }

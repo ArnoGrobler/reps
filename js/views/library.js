@@ -8,6 +8,7 @@ import { EXERCISES, EQUIPMENT, EX, EQ, EQUIP_ICON, EQUIP_COLOR, PATTERNS, PATTER
 import { LEVELS, alternatives, canDo, upcomingUses, replaceInPlan } from '../generator.js';
 import { getState, update, isDone } from '../store.js';
 import { todayKey } from '../dates.js';
+import { provenSectionHtml } from './proven.js';
 
 const ui = { q: '', equip: 'all' };
 
@@ -38,7 +39,7 @@ function matches(e, hidden) {
 function results(s) {
   const hidden = new Set(s.settings.hidden || []);
   const list = EXERCISES.filter((e) => matches(e, hidden));
-  const guide = !ui.q && ui.equip !== 'hidden' ? equipmentGuide(s) : '';
+  const guide = !ui.q && ui.equip !== 'hidden' ? (ui.equip === 'all' ? provenSectionHtml(s) : '') + equipmentGuide(s) : '';
   if (!list.length) return `${guide}<div class="card empty">${icon('search')}<div class="t-headline">No matches</div><p class="t-sub sec" style="margin:0">Try another name, a muscle like “glutes”, or clear the filter.</p></div>`;
   const groups = PATTERN_ORDER.map((p) => [p, list.filter((e) => e.pattern === p)]).filter(([, l]) => l.length);
   return `${guide}${groups.map(([p, l]) => `

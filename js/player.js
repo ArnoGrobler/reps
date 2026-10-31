@@ -45,6 +45,7 @@ function begin(mode) {
   cue.unlock();
   const all = flatten(day, EX);
   S.mode = mode;
+  S.effortShort = day.effortShort || '';
   S.steps = mode === 'timed' ? all : all.filter((s) => s.kind === 'work');
   S.i = 0;
   S.startedAt = now();
@@ -157,7 +158,9 @@ function startPhase(at, withCues) {
     const next = S.steps[st.next];
     const prevWork = S.steps.slice(0, S.i).reverse().find((x) => x.kind === 'work');
     const same = next && prevWork && next.exId === prevWork.exId;
-    cue.say(`Rest ${st.sec} seconds.${next ? (same ? '' : ` Next: ${next.name}.`) : ''}`);
+    if (st.active) cue.say(`${st.label}. ${st.sec} seconds.`);
+    else if (st.label === 'Transition') cue.say(next ? `Next: ${next.name}.` : 'Last one done.');
+    else cue.say(`Rest ${st.sec} seconds.${next ? (same ? '' : ` Next: ${next.name}.`) : ''}`);
   }
 }
 
@@ -487,10 +490,11 @@ function runView(phase) {
   if (!timed) return pacedView(st);
   const isReady = S.phase === 'ready';
   const work = isReady ? S.steps[0] : st.kind === 'work' ? st : S.steps[st.next];
-  const label = isReady ? 'Get Ready' : st.kind === 'rest' ? (st.long ? 'Round Rest' : 'Rest') : 'Work';
-  const name = isReady ? 'Get Ready' : st.kind === 'rest' ? 'Rest' : st.name;
+  const label = isReady ? 'Get Ready' : st.kind === 'rest' ? (st.label || 'Rest') : st.ramp ? 'Ramp-Up' : 'Work';
+  const name = isReady ? 'Get Ready' : st.kind === 'rest' ? (st.active ? st.label : st.label === 'Transition' && work ? work.name : 'Rest') : st.name;
   const sub = isReady ? 'Your workout starts in'
     : st.kind === 'rest' ? (work ? `Next: ${work.name}` : 'Last one done')
+    : st.ramp ? 'Light ramp-up set: about half effort'
     : st.sets > 1 ? `${setLabel(st)} · ${st.block}` : st.block;
   const nextUp = upNext();
   const size = 280;
@@ -502,6 +506,7 @@ function runView(phase) {
       <div class="pl-phase"><span>${esc(label)}</span>${S.paused ? '<span class="pl-paused">Paused</span>' : ''}</div>
       <h1 class="pl-name balance">${esc(name)}</h1>
       <div class="pl-sub">${esc(sub)}</div>
+      ${effortLine(st, isReady)}
       <div class="pl-ring-wrap">
         <svg class="pl-ring" viewBox="0 0 ${size} ${size}" aria-hidden="true">
           <circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="pl-ring-track"/>
@@ -540,6 +545,12 @@ function upNext() {
       <div class="t-foot sec">${esc(setLabel(target))} · ${esc(amountShort(target))}</div></div></div></div>`;
 }
 
+function effortLine(st, isReady) {
+  if (isReady || !st || st.kind !== 'work' || st.ramp || !S.effortShort) return '';
+  if (st.blockKind !== 'main' && st.blockKind !== 'finisher') return '';
+  return `<div class="pl-effort">${icon('gauge', 'xs')} ${esc(S.effortShort)}</div>`;
+}
+
 const setLabel = (st) => (st.sets > 1 ? `${st.circuit ? 'Round' : 'Set'} ${st.set} of ${st.sets}` : st.block);
 const amountShort = (st) => `${st.mode === 'time' ? `${st.duration} s` : `${st.reps} reps`}${st.perSide ? ' / side' : ''}`;
 
@@ -553,7 +564,9 @@ function pacedView(st) {
     <main class="pl-main">
       <div class="pl-phase"><span>${esc(st.block)}</span>${S.paused ? '<span class="pl-paused">Paused</span>' : ''}</div>
       <h1 class="pl-name balance">${esc(st.name)}</h1>
-      ${st.sets > 1 ? `<div class="pl-sub">${esc(setLabel(st))}</div>` : ''}
+      ${st.ramp ? '<div class="pl-sub">Light ramp-up set: about half effort</div>' : st.sets > 1 ? `<div class="pl-sub">${esc(setLabel(st))}</div>` : ''}
+      ${effortLine(st, false)}
+      ${st.atTop && st.set === st.sets ? '<div class="pl-hint">Top of your rep range. Next time, go heavier or pick a harder variation.</div>' : ''}
       <div class="pl-target">
         ${timerOn
           ? `<div class="pl-big rounded num" data-pl-big>0</div><div class="pl-small" data-pl-small>seconds left</div>`

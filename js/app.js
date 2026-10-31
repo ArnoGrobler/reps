@@ -16,6 +16,7 @@ import * as player from './player.js';
 import { haptic } from './audio.js';
 import * as profiles from './views/profiles.js';
 import * as syncViews from './views/sync.js';
+import * as proven from './views/proven.js';
 import { startAutoSync, syncProfile } from './sync.js';
 
 const TABS = [
@@ -32,7 +33,7 @@ let tab = ALL.some((t) => t.id === location.hash.slice(1)) ? location.hash.slice
 
 const ACTIONS = {
   ...calendarActions, ...planActions, ...libraryActions, ...dayActions,
-  ...editor.actions, ...settings.actions, ...wizard.actions, ...player.actions, ...profiles.actions, ...syncViews.actions,
+  ...editor.actions, ...settings.actions, ...wizard.actions, ...player.actions, ...profiles.actions, ...syncViews.actions, ...proven.actions,
   'go-tab': (el) => go(el.dataset.tab),
   'open-settings': () => openSheet(settings.settingsView(), { detent: 'large' }),
 };
@@ -136,7 +137,21 @@ function onScroll() {
 /** Press and slide along the tab bar: the selection lifts into a glass bubble that follows the thumb. */
 function bindTabbarDrag() {
   const bar = document.getElementById('tabbar');
+  const lens = bar.querySelector('.tab-lens');
   let down = false, moved = false, startX = 0, hover = -1, rect = null;
+  // Jelly physics: the bubble stretches with drag speed, squashes vertically, and wobbles as it settles.
+  const PRESSED = { x: 1.16, y: 1.36 };
+  let sx = 1, sy = 1, vx = 0, vy = 0, tx = 1, ty = 1, raf = 0, lastX = 0, lastT = 0, speed = 0;
+  const step = () => {
+    vx = (vx + (tx - sx) * 0.28) * 0.7; sx += vx;
+    vy = (vy + (ty - sy) * 0.28) * 0.7; sy += vy;
+    lens.style.scale = `${sx.toFixed(3)} ${sy.toFixed(3)}`;
+    if (down) { speed *= 0.9; tx = PRESSED.x + Math.min(0.5, speed * 0.4); ty = PRESSED.y - Math.min(0.3, speed * 0.24); }
+    const moving = Math.abs(vx) + Math.abs(vy) + Math.abs(tx - sx) + Math.abs(ty - sy) > 0.002;
+    if (down || moving) raf = requestAnimationFrame(step);
+    else { raf = 0; lens.style.scale = ''; }
+  };
+  const kick = () => { if (!raf) raf = requestAnimationFrame(step); };
   const tabW = () => (rect.width - 8) / TABS.length;
   const place = (x) => {
     const w = tabW();
@@ -145,6 +160,7 @@ function bindTabbarDrag() {
     if (i === hover) return;
     hover = i;
     bar.querySelectorAll('.tab').forEach((t, k) => t.classList.toggle('is-hover', k === i));
+    if (moved) { vy += 0.06; vx -= 0.03; kick(); }   // small bounce on each new tab
     if (moved && getState().settings.haptics) haptic(6);
   };
   bar.addEventListener('pointerdown', (e) => {
@@ -153,24 +169,30 @@ function bindTabbarDrag() {
     down = true; moved = false; startX = e.clientX; hover = -1;
     try { bar.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
     place(e.clientX);
-    bar.classList.remove('settle');
     bar.classList.add('is-pressing');
+    lastX = e.clientX; lastT = performance.now(); speed = 0;
+    sx = 1; sy = 1; vx = 0; vy = 0; tx = PRESSED.x; ty = PRESSED.y;   // pops up on touch
+    kick();
   });
   bar.addEventListener('pointermove', (e) => {
     if (!down) return;
     if (Math.abs(e.clientX - startX) > 6) moved = true;
+    const now = performance.now();
+    const v = Math.abs(e.clientX - lastX) / Math.max(8, now - lastT);   // px per ms
+    speed = speed * 0.5 + v * 0.5;
+    lastX = e.clientX; lastT = now;
     place(e.clientX);
+    kick();
   });
   const end = (cancel) => {
     if (!down) return;
     down = false;
     bar.classList.remove('is-pressing');
     bar.querySelectorAll('.tab').forEach((t) => t.classList.remove('is-hover'));
-    if (cancel) return;
+    if (cancel) { tx = 1; ty = 1; kick(); return; }
     suppressClickUntil = Date.now() + 400;
-    void bar.offsetWidth;
-    bar.classList.add('settle');
-    setTimeout(() => bar.classList.remove('settle'), 600);
+    tx = 1; ty = 1; vx -= 0.08; vy += 0.05;   // shrink back with a wobble while it slides home
+    kick();
     if (TABS[hover]) go(TABS[hover].id);
   };
   bar.addEventListener('pointerup', () => end(false));

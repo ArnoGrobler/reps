@@ -5,7 +5,8 @@ import { esc, showMenu, alertDialog, toast } from '../ui.js';
 import { EQ, EQUIP_ICON, EQUIP_COLOR } from '../data.js';
 import { todayKey, addDays, fmt, fmtMonthDay, weekdayLetters, diffDays } from '../dates.js';
 import { getState, update, planProgress, isDone, getDay, planRange } from '../store.js';
-import { GOALS, LEVELS, countExercises } from '../generator.js';
+import { GOALS, LEVELS, LOADS, countExercises, weeklySets } from '../generator.js';
+import { EX } from '../data.js';
 import { openWizard } from '../wizard.js';
 
 const ui = { week: null };
@@ -44,6 +45,7 @@ export function renderPlan(s) {
         <div class="chips">
           <span class="tag accent">${icon(GOALS[p.goal]?.icon || 'activity')}${esc(GOALS[p.goal]?.label || p.goal)}</span>
           <span class="tag">${icon('gauge')}${esc(LEVELS[p.level])}</span>
+          ${p.equipment.some((q) => q === 'kettlebell' || q === 'dumbbells') ? `<span class="tag">${icon('weight')}${esc(LOADS[p.load || 'moderate'].label)} weights</span>` : ''}
           ${p.equipment.map((q) => `<span class="tag">${icon(EQUIP_ICON[q] || 'dumbbell')}${esc(EQ[q]?.name || q)}</span>`).join('')}
         </div>
         <div class="plan-progress">
@@ -88,7 +90,8 @@ export function renderPlan(s) {
           }).join('')}
         </div>
         <p class="footnote">Tap a day to see the exercises, watch demos, mark it done, or change it.</p>
-      </section>`,
+      </section>
+      ${volumeCard(p, weekStart)}`,
   };
 }
 
@@ -114,3 +117,23 @@ export const actions = {
 };
 
 export function resetPlanUi() { ui.week = null; }
+
+/** Weekly hard sets per body region against the ACSM 2026 targets (evidence §1). */
+function volumeCard(p, weekStart) {
+  const ws = weeklySets(p, weekStart, EX);
+  const target = p.level === 1 ? 4 : 10;
+  const rows = [['upperPush', 'Upper push'], ['upperPull', 'Upper pull'], ['lowerPush', 'Squat & lunge'], ['lowerPull', 'Hinge']];
+  const any = Object.values(ws).some((v) => v > 0);
+  if (!any) return '';
+  return `<section class="section">
+    <div class="section-head"><div class="section-title">Weekly Sets</div><button class="section-link" data-action="open-science">Why</button></div>
+    <div class="card volume-card">
+      ${rows.map(([k, label]) => {
+        const v = Math.round(ws[k]);
+        const pct = Math.min(1, v / Math.max(target, 1));
+        return `<div class="vol-row"><span class="vol-label">${label}</span><div class="bar"><i style="width:${Math.round(pct * 100)}%;background:${v >= target ? 'var(--green)' : 'var(--orange)'}"></i></div><span class="vol-num rounded num">${v}</span></div>`;
+      }).join('')}
+      <p class="t-foot sec" style="margin:4px 0 0">Target: at least ${target} hard sets per region a week${p.level === 1 ? ' for beginners' : ', up to about 20'}. ${Object.values(ws).some((v) => v < target) ? 'Short or few sessions limit this; more minutes or another day raises it.' : 'This week meets it.'}</p>
+    </div>
+  </section>`;
+}

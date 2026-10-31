@@ -6,7 +6,7 @@ import { esc, segmented, switchHtml, stepperHtml, toast } from './ui.js';
 import { EXERCISES, EQUIPMENT, EQUIP_ICON, EQUIP_COLOR, EQ, allowedExercises } from './data.js';
 import { todayKey, addDays, dow, fmtMonthDay, fmt, weekdayLetters, startOfWeek, fmtMinutes, LOCALE } from './dates.js';
 import { getState, update } from './store.js';
-import { generatePlan, GOALS, LEVELS, countExercises } from './generator.js';
+import { generatePlan, GOALS, LEVELS, LOADS, countExercises } from './generator.js';
 
 const STEPS = ['Goal', 'Length', 'Equipment', 'Time', 'Review'];
 const DAY_NAMES = Array.from({ length: 7 }, (_, d) => new Intl.DateTimeFormat(LOCALE, { weekday: 'long' }).format(new Date(2026, 10, 1 + d, 12)));
@@ -16,7 +16,7 @@ let el = null;
 
 function defaults() {
   return {
-    step: 0, fromPlan: false, goal: 'balanced', level: 2, weeks: 8, startMode: 'next', customStart: todayKey(),
+    step: 0, fromPlan: false, goal: 'balanced', level: 2, load: 'moderate', weeks: 8, startMode: 'next', customStart: todayKey(),
     equipment: ['bodyweight', 'kettlebell', 'dumbbells'], usual: 30,
     schedule: [0, 30, 30, 0, 30, 0, 45], seed: Math.floor(Math.random() * 1e9), preview: null,
   };
@@ -28,7 +28,7 @@ export function openWizard({ fromPlan = false } = {}) {
   if (s.plan && fromPlan) {
     const p = s.plan;
     Object.assign(wz, {
-      fromPlan: true, goal: p.goal, level: p.level, weeks: p.weeks, equipment: [...p.equipment],
+      fromPlan: true, goal: p.goal, level: p.level, load: p.load || 'moderate', weeks: p.weeks, equipment: [...p.equipment],
       schedule: [...p.schedule], startMode: 'keep', customStart: p.startDate,
     });
   }
@@ -69,7 +69,7 @@ function weeklyMinutes() { return wz.schedule.reduce((a, b) => a + b, 0); }
 
 function buildPreview() {
   const s = getState();
-  const plan = generatePlan({ goal: wz.goal, level: wz.level, weeks: wz.weeks, startDate: startDate(), equipment: wz.equipment, schedule: wz.schedule, seed: wz.seed }, allowedExercises(s.settings));
+  const plan = generatePlan({ goal: wz.goal, level: wz.level, load: wz.load, weeks: wz.weeks, startDate: startDate(), equipment: wz.equipment, schedule: wz.schedule, seed: wz.seed }, allowedExercises(s.settings));
   if (wz.fromPlan && s.plan) {
     // Keep the days that already happened exactly as they were.
     const t = todayKey();
@@ -166,7 +166,16 @@ function stepEquipment() {
           <span class="option-check">${icon('check', 'bold')}</span>
         </button>`;
       }).join('')}
-    </div>`;
+    </div>
+    ${wz.equipment.some((q) => q === 'kettlebell' || q === 'dumbbells') ? `
+    <div class="section"><div class="section-head"><div class="section-title">How heavy are your weights?</div></div>
+      <div class="option-stack" role="radiogroup">
+        ${Object.entries(LOADS).map(([k, l]) => `<button class="option-card compact ${wz.load === k ? 'is-on' : ''}" role="radio" aria-checked="${wz.load === k}" data-action="wiz-load" data-load="${k}">
+          <div class="grow"><div class="t-headline">${esc(l.label)}</div><div class="t-sub sec">${esc(l.desc)}</div></div>
+          <span class="option-check">${icon('check', 'bold')}</span></button>`).join('')}
+      </div>
+      <p class="footnote">This sets your rep ranges. Light weights still build muscle when sets are taken close to failure, so Reps uses higher reps for them.</p>
+    </div>` : ''}`;
 }
 
 function stepTime() {
@@ -189,7 +198,7 @@ function stepTime() {
           </div>`;
         }).join('')}
       </div>
-      ${trainingDays() === 0 ? '<p class="footnote" style="color:var(--red)">Turn on at least one day.</p>' : ''}
+      ${trainingDays() === 0 ? '<p class="footnote" style="color:var(--red)">Turn on at least one day.</p>' : trainingDays() === 1 ? '<p class="footnote">The American College of Sports Medicine recommends at least 2 strength sessions a week. One still helps, and you can add a day later.</p>' : ''}
     </div>`;
 }
 
@@ -203,7 +212,7 @@ function stepReview() {
   const s = getState();
   return `
     <div class="wiz-head"><div class="eyebrow accent">Step 5 of 5</div><h1 class="t-title1 heavy">${esc(p.name)}</h1>
-      <p class="t-callout sec">${esc(fmtMonthDay(p.startDate))} – ${esc(fmtMonthDay(addDays(p.startDate, p.weeks * 7 - 1)))} · ${esc(GOALS[p.goal].label)} · ${esc(LEVELS[p.level])}</p></div>
+      <p class="t-callout sec">${esc(fmtMonthDay(p.startDate))} – ${esc(fmtMonthDay(addDays(p.startDate, p.weeks * 7 - 1)))} · ${esc(GOALS[p.goal].label)} · ${esc(LEVELS[p.level])}${p.equipment.some((q) => q === 'kettlebell' || q === 'dumbbells') ? ` · ${esc(LOADS[p.load || 'moderate'].label)} weights` : ''}</p></div>
     <div class="card plan-card">
       <div class="chips">${p.equipment.map((q) => `<span class="tag">${icon(EQUIP_ICON[q] || 'dumbbell')}${esc(EQ[q]?.name || q)}</span>`).join('')}</div>
       <div class="sched">${order.map((d, i) => `<div class="sched-day ${p.schedule[d] ? 'on' : ''}"><span>${esc(letters[i])}</span><b class="rounded">${p.schedule[d] || '–'}</b></div>`).join('')}</div>
@@ -233,6 +242,7 @@ export const actions = {
   'wiz-back': () => { wz.step = Math.max(0, wz.step - 1); render(); el.scrollTop = 0; },
   'wiz-next': () => { wz.step = Math.min(4, wz.step + 1); if (wz.step === 4) wz.preview = null; render(); el.scrollTop = 0; },
   'wiz-goal': (b) => { wz.goal = b.dataset.goal; render(); },
+  'wiz-load': (b) => { wz.load = b.dataset.load; render(); },
   'wiz-weeks': (b) => { wz.weeks = +b.dataset.weeks; render(); },
   'wiz-start': (b) => { wz.startMode = b.dataset.mode; render(); },
   'wiz-equip': (b) => {
