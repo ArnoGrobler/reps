@@ -675,6 +675,7 @@ export function renderAccessory() {
 }
 
 export const hasAccessory = () => !!accessoryHtml();
+export const hasActiveSession = () => !!S && S.phase !== 'select' && S.phase !== 'done';
 
 /* ---------- Actions ---------- */
 

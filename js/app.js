@@ -3,7 +3,7 @@
 
 import { icon } from './icons.js';
 import { getState, subscribe, activeProfile, getRegistry, onBeforeSwitch, onAfterSwitch } from './store.js';
-import { refreshSheet, openSheet, closeSheet } from './ui.js';
+import { refreshSheet, openSheet, closeSheet, toast } from './ui.js';
 import { renderToday } from './views/today.js';
 import { renderCalendar, actions as calendarActions } from './views/calendar.js';
 import { renderPlan, actions as planActions, resetPlanUi } from './views/plan.js';
@@ -305,5 +305,17 @@ else if (reg.askOnLaunch && reg.profiles.length > 1) profiles.openProfiles();
 startAutoSync();
 
 if ('serviceWorker' in navigator && location.protocol === 'https:' && !/claude\.ai|claudeusercontent/.test(location.hostname)) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  // Check for a new version whenever the app comes back to the foreground, and reload
+  // once it takes over so the new files are used (unless a workout is running).
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    if (player.hasActiveSession()) toast('A new version is ready', { iconName: 'refresh-cw', duration: 15000, action: { label: 'Reload', onClick: () => location.reload() } });
+    else location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  }).catch(() => {});
 }

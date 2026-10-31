@@ -7,7 +7,7 @@ import { getState, update, replaceState, resetAll, activeProfile, getProfiles, s
 import { avatarHtml } from './profiles.js';
 import { syncSectionHtml } from './sync.js';
 import { openWizard } from '../wizard.js';
-import { EXERCISES } from '../data.js';
+import { EXERCISES, VERSION } from '../data.js';
 
 const ACCENTS = [['orange', 'Orange'], ['red', 'Red'], ['pink', 'Pink'], ['purple', 'Purple'], ['indigo', 'Indigo'], ['blue', 'Blue'], ['mint', 'Mint'], ['green', 'Green']];
 
@@ -73,7 +73,7 @@ export function settingsView() {
           </div>
           <p class="footnote">${me?.sync?.gistId ? 'This profile syncs through GitHub. A backup file is still handy as an extra copy.' : 'This profile is stored on this device only. Turn on sync, or back up before switching phones or clearing your browser.'}</p>
         </section>
-        <p class="footnote" style="text-align:center">Reps · ${EXERCISES.length} exercises · Icons by Lucide (ISC). Demo videos belong to their YouTube creators.</p>`;
+        <p class="footnote" style="text-align:center">Reps ${VERSION} · ${EXERCISES.length} exercises · Icons by Lucide (ISC). Demo videos belong to their YouTube creators.</p>`;
     },
   };
 }

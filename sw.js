@@ -1,5 +1,7 @@
 // Offline support: network first (so updates arrive right away), cache as fallback.
-const CACHE = 'reps-v3';
+// GitHub Pages lets browsers reuse files for 10 minutes; every request here asks the
+// server whether the file changed (cheap 304 when it hasn't), so updates are never stuck.
+const CACHE = 'reps-v4';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/icons.js', './js/ui.js', './js/store.js', './js/dates.js', './js/data.js',
@@ -10,7 +12,7 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -21,7 +23,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-cache' })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));
