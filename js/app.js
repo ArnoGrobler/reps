@@ -39,7 +39,7 @@ const ACTIONS = {
 };
 const STEP = [editor.onStep, settings.onStep, wizard.onStep];
 const SEG = [editor.onSeg, settings.onSeg, wizard.onSeg];
-const TOGGLE = [editor.onToggle, settings.onToggle, wizard.onToggle, profiles.onToggle];
+const TOGGLE = [editor.onToggle, settings.onToggle, wizard.onToggle, profiles.onToggle, syncViews.onToggle];
 const INPUT = [libraryInput, editor.onInput, wizard.onInput, profiles.onInput, syncViews.onInput];
 const CHANGE = [settings.onChange, wizard.onChange, profiles.onChange];
 

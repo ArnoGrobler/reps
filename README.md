@@ -48,8 +48,8 @@ Then open http://localhost:8000. ES modules don't load from `file://`.
 Each profile's plan, history and settings are stored in the browser on the device. To keep a profile the same on several devices:
 
 1. On GitHub, create a classic token with only the **gist** scope (Reps links straight to the page) and give it an expiry date.
-2. In Reps, tap your avatar → **Sync with GitHub** and paste the token.
-3. On another device, use **Set Up from GitHub** on the "Who's training?" screen with a token for the same account.
+2. In Reps, tap your avatar → **Sync with GitHub** and paste the token. The other profiles on that device are synced too (each gets its own gist); a profile added later shows a **Sync … Too** row in the account sheet.
+3. On another device, use **Set Up from GitHub** on the "Who's training?" screen (or **Add Profiles from GitHub** in the account sheet) with a token for the same account. A profile with the same name already on that device is merged rather than duplicated.
 
 How it works: each profile is one secret gist (`reps-profile.json`). Reps pulls when it opens, pushes a few seconds after a change, and works offline. The most recently changed plan and settings win; completed days merge day by day, so finishing a workout on one device and editing the plan on another keeps both.
 

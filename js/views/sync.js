@@ -1,13 +1,16 @@
-// Sync screens: the Settings section, connecting a profile to GitHub, choosing a
-// sync file, and setting up a new device from GitHub.
+// Sync screens: the Settings section, connecting profiles to GitHub, choosing a
+// sync file, and bringing profiles from GitHub onto this device.
+// Connecting one profile also connects the other profiles on the device (each gets
+// its own secret gist), so a second device can find everyone.
 
 import { icon } from '../icons.js';
-import { esc, pushSheet, popSheet, closeSheet, refreshSheet, alertDialog, toast } from '../ui.js';
+import { esc, pushSheet, popSheet, closeSheet, refreshSheet, alertDialog, toast, switchHtml } from '../ui.js';
 import { getProfile, getProfiles, activeProfile, addProfile, updateProfile, switchProfile } from '../store.js';
-import { verifyToken, findRemoteProfiles, readRemote, linkProfile, unlinkProfile, getStatus, syncProfile, savedTokens } from '../sync.js';
+import { verifyToken, findRemoteProfiles, readRemote, linkProfile, linkMany, unsyncedProfiles, unlinkProfile, getStatus, syncProfile, savedTokens } from '../sync.js';
 
 const TOKEN_URL = 'https://github.com/settings/tokens/new?description=Reps%20sync&scopes=gist';
-const ctx = { pid: null, token: '', login: '', found: [], busy: false, error: '', mode: 'link' };
+const ctx = { pid: null, token: '', login: '', found: [], busy: false, error: '', mode: 'link', alsoOthers: true };
+const names = (list) => (list.length <= 2 ? list.join(' and ') : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`);
 
 function ago(ts) {
   if (!ts) return '';
@@ -54,6 +57,9 @@ export function syncSectionHtml(pid) {
       <div class="row has-icon"><div class="row-icon" style="background:var(--green)">${icon('cloud')}</div>
         <div class="grow"><div class="title">GitHub · @${esc(p.sync.login || 'account')}</div><div class="subtitle sync-line" data-sync-status="${pid}">${esc(statusText(pid))}</div></div></div>
       <button class="row has-icon" data-action="sync-now"><div class="row-icon" style="background:var(--blue)">${icon('refresh-cw')}</div><div class="grow title">Sync Now</div></button>
+      ${unsyncedProfiles(pid).map((o) => `<button class="row has-icon" data-action="sync-also" data-id="${o.id}"><div class="row-icon" style="background:var(--indigo)">${icon('users')}</div>
+        <div class="grow"><div class="title">Sync ${esc(o.name)} Too</div><div class="subtitle">${esc(o.name)} is only on this device. Uses @${esc(p.sync.login || 'your')} GitHub.</div></div></button>`).join('')}
+      <button class="row has-icon" data-action="sync-add-from-github"><div class="row-icon" style="background:var(--teal)">${icon('user-plus')}</div><div class="grow"><div class="title">Add Profiles from GitHub</div><div class="subtitle">Bring synced profiles from your other devices</div></div>${icon('chevron-right', 'chev')}</button>
       <button class="row has-icon" data-action="sync-unlink"><div class="row-icon" style="background:var(--red)">${icon('unlink')}</div><div class="grow title" style="color:var(--red)">Stop Syncing on This Device</div></button>
     </div>
     <p class="footnote">Stored in a secret gist on @${esc(p.sync.login || 'your account')}’s GitHub. Secret gists are unlisted, not encrypted: anyone with the exact link could read the workout data.</p></section>`;
@@ -84,6 +90,7 @@ export function connectView(pid) {
       ctx.mode = 'link';
       return `<p class="t-callout sec" style="margin:0">Reps saves this profile to a secret gist on GitHub. Every device using a token for the same account stays in step, and it keeps working offline.</p>
         ${tokenSteps(pid)}
+        ${unsyncedProfiles(pid).length ? `<div class="list"><div class="row"><div class="grow"><div class="title">Also sync ${esc(names(unsyncedProfiles(pid).map((o) => o.name)))}</div><div class="subtitle">Each profile gets its own sync file, so your other devices can add them</div></div>${switchHtml('sync:also', ctx.alsoOthers, 'Also sync the other profiles on this device')}</div></div>` : ''}
         <button class="btn btn-filled lg block" data-action="sync-verify" ${ctx.busy ? 'disabled' : ''}>${ctx.busy ? 'Connecting…' : 'Connect'}</button>`;
     },
   };
@@ -129,6 +136,43 @@ export function restoreView() {
   };
 }
 
+/** Profiles that sync to this GitHub account but are not on this device yet. */
+function extraView({ loading = false } = {}) {
+  return {
+    title: 'Profiles on GitHub',
+    get subtitle() { return ctx.login ? `@${ctx.login}` : ''; },
+    render: () => {
+      if (ctx.busy && !ctx.found.length) return '<div class="card empty"><div class="t-headline">Looking on GitHub…</div></div>';
+      const have = new Set(getProfiles().map((x) => x.sync?.gistId).filter(Boolean));
+      const missing = ctx.found.filter((f) => !have.has(f.gistId));
+      if (ctx.error) return `<div class="sync-error">${icon('triangle-alert', 'sm')}<span>${esc(ctx.error)}</span></div>`;
+      if (!missing.length) {
+        return `<div class="card empty">${icon('circle-check')}<div class="t-headline">Everyone is here</div>
+          <p class="t-sub sec" style="margin:0">Every profile synced to @${esc(ctx.login)} is on this device. If one is missing, open Reps on the device where it was made and tap “Sync … Too” in the account sheet.</p></div>`;
+      }
+      return `<p class="t-callout sec" style="margin:0">These profiles sync to @${esc(ctx.login)} but are not on this device yet.</p>
+        <div class="list">${missing.map((f) => `<button class="row has-icon" data-action="sync-restore-one" data-gist="${esc(f.gistId)}" ${ctx.busy ? 'disabled' : ''}>
+          <div class="row-icon" style="background:var(--green)">${icon('cloud')}</div>
+          <div class="grow"><div class="title">${esc(f.name)}</div><div class="subtitle">Updated ${esc(ago(Date.parse(f.updatedAt)))}</div></div><span class="accent">${icon('plus')}</span></button>`).join('')}</div>
+        <button class="btn btn-filled lg block" data-action="sync-restore-all" ${ctx.busy ? 'disabled' : ''}>${ctx.busy ? 'Adding…' : (missing.length > 1 ? 'Add All' : `Add ${esc(missing[0].name)}`)}</button>`;
+    },
+  };
+  void loading;
+}
+
+/** After connecting the current profile: connect the others too, then offer profiles from GitHub. */
+async function finishLink(depth) {
+  const others = ctx.alsoOthers ? unsyncedProfiles(ctx.pid).map((x) => x.id) : [];
+  const linked = others.length ? await linkMany(others, { token: ctx.token, login: ctx.login, found: ctx.found }) : [];
+  ctx.found = await findRemoteProfiles(ctx.token);
+  const have = new Set(getProfiles().map((x) => x.sync?.gistId).filter(Boolean));
+  const missing = ctx.found.filter((f) => !have.has(f.gistId));
+  for (let i = 0; i < depth; i++) popSheet();
+  const who = [getProfile(ctx.pid)?.name, ...linked].filter(Boolean);
+  toast(who.length > 1 ? `Sync is on for ${names(who)}` : 'Sync is on', { iconName: 'cloud' });
+  if (missing.length) pushSheet(extraView());
+}
+
 /* ---------- Actions ---------- */
 
 async function busy(fn) {
@@ -140,9 +184,11 @@ async function restoreGist(gistId) {
   const remote = await readRemote(ctx.token, gistId);
   if (!remote?.state) throw new Error('That sync file is empty or damaged.');
   const rp = remote.profile || {};
-  const existing = rp.id && getProfile(rp.id);
   const sync = { token: ctx.token, login: ctx.login, gistId, lastSyncAt: 0, lastError: null };
-  if (existing) { updateProfile(existing.id, { sync }, { quiet: true }); syncProfile(existing.id); return existing; }
+  // Same profile already here (by id), or an unsynced profile with the same name: link and merge instead of duplicating.
+  const existing = (rp.id && getProfile(rp.id))
+    || getProfiles().find((x) => !x.sync?.gistId && x.name.trim().toLowerCase() === (rp.name || '').trim().toLowerCase());
+  if (existing) { updateProfile(existing.id, { sync }, { quiet: true }); await syncProfile(existing.id); return { ...existing, merged: true }; }
   return addProfile({ id: rp.id || undefined, name: rp.name || 'Profile', color: rp.color || 'orange', photo: rp.photo || null, sync, data: remote.state });
 }
 
@@ -151,11 +197,14 @@ function finishRestore(added) {
   closeSheet();
   if (added[0] && !activeProfile()) switchProfile(added[0].id);
   document.dispatchEvent(new CustomEvent('reps:profiles'));
-  if (added.length) toast(added.length === 1 ? `${added[0].name} added` : `${added.length} profiles added`, { iconName: 'cloud' });
+  const added_ = added.filter((x) => !x.merged).map((x) => x.name);
+  const merged = added.filter((x) => x.merged).map((x) => x.name);
+  const parts = [added_.length ? `${names(added_)} added` : '', merged.length ? `${names(merged)} merged with this device` : ''].filter(Boolean);
+  if (parts.length) toast(parts.join(' · '), { iconName: 'cloud' });
 }
 
 export const actions = {
-  'sync-connect': () => { ctx.token = ''; ctx.error = ''; ctx.found = []; pushSheet(connectView(activeProfile().id)); },
+  'sync-connect': () => { Object.assign(ctx, { token: '', error: '', found: [], alsoOthers: true }); pushSheet(connectView(activeProfile().id)); },
   'sync-use-saved': (b) => {
     const t = savedTokens(ctx.pid)[+b.dataset.i];
     if (!t) return;
@@ -175,19 +224,35 @@ export const actions = {
     }
     if (ctx.found.length) { pushSheet(chooseView()); return; }
     await linkProfile(ctx.pid, { token, login: user.login });
-    popSheet();
-    toast('Sync is on', { iconName: 'cloud' });
+    await finishLink(1);
   }),
   'sync-link': (b) => busy(async () => {
     await linkProfile(ctx.pid, { token: ctx.token, login: ctx.login, gistId: b.dataset.gist });
-    popSheet(); popSheet();
-    toast('Sync is on', { iconName: 'cloud' });
+    await finishLink(2);
   }),
   'sync-link-new': () => busy(async () => {
     await linkProfile(ctx.pid, { token: ctx.token, login: ctx.login });
-    popSheet(); popSheet();
-    toast('Sync is on', { iconName: 'cloud' });
+    await finishLink(2);
   }),
+  'sync-also': async (b) => {
+    const me = activeProfile();
+    const other = getProfile(b.dataset.id);
+    if (!me?.sync?.token || !other) return;
+    toast(`Connecting ${other.name}…`, { iconName: 'cloud' });
+    try {
+      await linkMany([other.id], { token: me.sync.token, login: me.sync.login });
+      toast(`${other.name} now syncs too`, { iconName: 'cloud' });
+    } catch (e) {
+      toast(e.message || 'Could not connect', { iconName: 'triangle-alert' });
+    }
+  },
+  'sync-add-from-github': () => {
+    const me = activeProfile();
+    if (!me?.sync?.token) return;
+    Object.assign(ctx, { token: me.sync.token, login: me.sync.login, found: [], error: '', mode: 'restore' });
+    pushSheet(extraView());
+    busy(async () => { ctx.found = await findRemoteProfiles(ctx.token); });
+  },
   'sync-restore-one': (b) => busy(async () => { finishRestore([await restoreGist(b.dataset.gist)]); }),
   'sync-restore-all': () => busy(async () => {
     const have = new Set(getProfiles().map((p) => p.sync?.gistId).filter(Boolean));
@@ -208,6 +273,12 @@ export const actions = {
     toast('Sync turned off on this device', { iconName: 'cloud-off' });
   },
 };
+
+export function onToggle(id) {
+  if (id !== 'sync:also') return false;
+  ctx.alsoOthers = !ctx.alsoOthers;
+  return true;
+}
 
 export function onInput(e) {
   if (e.target.id !== 'sync-token') return false;

@@ -12,8 +12,8 @@ const DESCRIPTION = 'Reps workout data';
 
 const status = {};          // profile id → { state: idle|pending|syncing|ok|error|offline, message }
 let pushTimer = 0;
-let running = null;
-let rerun = false;
+let chain = Promise.resolve();   // syncs run one at a time, in order
+const jobs = new Map();          // profile id → { promise, started }
 
 /* ---------- GitHub API ---------- */
 
@@ -157,39 +157,48 @@ export function getStatus(pid) {
 
 /* ---------- Sync ---------- */
 
-/** Pull, merge and push one profile. Safe to call often; overlapping calls are queued. */
-export async function syncProfile(pid = activeProfile()?.id) {
+/**
+ * Pull, merge and push one profile. Safe to call often: syncs run one at a time, and a
+ * request for a profile that is already waiting joins that run instead of adding another.
+ */
+export function syncProfile(pid = activeProfile()?.id) {
+  const p = getProfile(pid);
+  if (!p?.sync?.token || !p.sync.gistId) return Promise.resolve();
+  const waiting = jobs.get(pid);
+  if (waiting && !waiting.started) return waiting.promise;
+  const entry = { started: false };
+  entry.promise = chain.then(() => { entry.started = true; return runSync(pid); })
+    .finally(() => { if (jobs.get(pid) === entry) jobs.delete(pid); });
+  chain = entry.promise.catch(() => {});
+  jobs.set(pid, entry);
+  return entry.promise;
+}
+
+async function runSync(pid) {
   const p = getProfile(pid);
   if (!p?.sync?.token || !p.sync.gistId) return;
-  if (running) { rerun = true; return running; }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) { setStatus(pid, 'offline'); return; }
   setStatus(pid, 'syncing');
-  running = (async () => {
-    try {
-      const remote = await readRemote(p.sync.token, p.sync.gistId);
-      const local = readProfileState(pid);
-      const merged = mergeStates(local, remote?.state);
-      if (fingerprint(merged) !== fingerprint(local)) applyRemoteState(pid, merged);
-      const fresh = getProfile(pid);
-      const nameChanged = remote && (remote.profile?.name !== fresh.name || remote.profile?.color !== fresh.color || (remote.profile?.photo || null) !== (fresh.photo || null));
-      if (!remote || nameChanged || fingerprint(merged) !== fingerprint(remote.state)) {
-        await writeRemote(p.sync.token, p.sync.gistId, fresh, merged);
-      }
-      updateProfile(pid, { sync: { ...getProfile(pid).sync, lastSyncAt: Date.now(), lastError: null } }, { quiet: true });
-      setStatus(pid, 'ok');
-    } catch (e) {
-      if (e.offline) setStatus(pid, 'offline');
-      else {
-        const cur = getProfile(pid);
-        if (cur?.sync) updateProfile(pid, { sync: { ...cur.sync, lastError: e.message } }, { quiet: true });
-        setStatus(pid, 'error', e.message);
-      }
-    } finally {
-      running = null;
-      if (rerun) { rerun = false; syncProfile(activeProfile()?.id); }
+  try {
+    const remote = await readRemote(p.sync.token, p.sync.gistId);
+    const local = readProfileState(pid);
+    const merged = mergeStates(local, remote?.state);
+    if (fingerprint(merged) !== fingerprint(local)) applyRemoteState(pid, merged);
+    const fresh = getProfile(pid);
+    const nameChanged = remote && (remote.profile?.name !== fresh.name || remote.profile?.color !== fresh.color || (remote.profile?.photo || null) !== (fresh.photo || null));
+    if (!remote || nameChanged || fingerprint(merged) !== fingerprint(remote.state)) {
+      await writeRemote(p.sync.token, p.sync.gistId, fresh, merged);
     }
-  })();
-  return running;
+    updateProfile(pid, { sync: { ...getProfile(pid).sync, lastSyncAt: Date.now(), lastError: null } }, { quiet: true });
+    setStatus(pid, 'ok');
+  } catch (e) {
+    if (e.offline) setStatus(pid, 'offline');
+    else {
+      const cur = getProfile(pid);
+      if (cur?.sync) updateProfile(pid, { sync: { ...cur.sync, lastError: e.message } }, { quiet: true });
+      setStatus(pid, 'error', e.message);
+    }
+  }
 }
 
 /** Push local changes a moment after they happen (batches quick edits). */
@@ -208,6 +217,29 @@ export async function linkProfile(pid, { token, login, gistId }) {
   updateProfile(pid, { sync: { token, login, gistId: id, lastSyncAt: 0, lastError: null } });
   await syncProfile(pid);
   return id;
+}
+
+/** Profiles on this device that are not synced yet. */
+export const unsyncedProfiles = (exceptPid) => getProfiles().filter((p) => p.id !== exceptPid && !p.sync?.gistId);
+
+/**
+ * Link several profiles to one GitHub account. Each gets its own secret gist; a profile
+ * reuses an existing Reps gist with the same name (so a second device joins it) instead
+ * of creating a duplicate.
+ */
+export async function linkMany(pids, { token, login, found = null }) {
+  const remote = found || await findRemoteProfiles(token);
+  const taken = new Set(getProfiles().map((p) => p.sync?.gistId).filter(Boolean));
+  const linked = [];
+  for (const pid of pids) {
+    const p = getProfile(pid);
+    if (!p || p.sync?.gistId) continue;
+    const match = remote.find((r) => !taken.has(r.gistId) && r.name.trim().toLowerCase() === p.name.trim().toLowerCase());
+    if (match) taken.add(match.gistId);
+    await linkProfile(pid, { token, login, gistId: match?.gistId });
+    linked.push(p.name);
+  }
+  return linked;
 }
 
 /** Forget the token on this device. The gist on GitHub is kept. */
