@@ -181,6 +181,23 @@ export function resetAll() {
   notify();
 }
 
+/** Wipe everything Reps stored on this device: all profiles, plans, history, settings, tokens and sessions. */
+export function resetDevice() {
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith('reps.')).forEach((k) => localStorage.removeItem(k));
+  } catch { /* storage unavailable */ }
+  registry = { activeId: null, askOnLaunch: true, profiles: [] };
+  state = blank();
+}
+
+/** True when a profile has a plan or history that exists only on this device. */
+export function hasUnsyncedData(pid) {
+  const p = getProfile(pid);
+  if (!p || p.sync?.gistId) return false;
+  const s = pid === registry.activeId ? state : normalize(read(stateKey(pid)));
+  return !!s.plan || Object.values(s.log || {}).some((l) => l?.completed);
+}
+
 /** Raw stored state for any profile (sync reads profiles that are not active). */
 export function readProfileState(pid) {
   return pid === registry.activeId ? state : normalize(read(stateKey(pid)));

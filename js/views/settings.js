@@ -3,7 +3,7 @@
 
 import { icon } from '../icons.js';
 import { esc, segmented, switchHtml, stepperHtml, closeSheet, alertDialog, toast } from '../ui.js';
-import { getState, update, replaceState, resetAll, activeProfile, getProfiles, switchProfile } from '../store.js';
+import { getState, update, replaceState, resetAll, resetDevice, hasUnsyncedData, activeProfile, getProfiles, switchProfile } from '../store.js';
 import { avatarHtml } from './profiles.js';
 import { syncSectionHtml } from './sync.js';
 import { openWizard } from '../wizard.js';
@@ -70,6 +70,7 @@ export function settingsView() {
             <label class="row has-icon tappable" for="restore-file"><div class="row-icon" style="background:var(--blue)">${icon('upload')}</div><div class="grow"><div class="title">Restore from Backup</div><div class="subtitle">Choose a .json backup file</div></div></label>
             <input type="file" id="restore-file" accept="application/json,.json" hidden>
             <button class="row has-icon" data-action="erase-all"><div class="row-icon" style="background:var(--red)">${icon('trash-2')}</div><div class="grow title" style="color:var(--red)">Erase ${esc(me?.name || 'Profile')}’s Data</div></button>
+            <button class="row has-icon" data-action="reset-device"><div class="row-icon" style="background:var(--red)">${icon('rotate-ccw')}</div><div class="grow"><div class="title" style="color:var(--red)">Reset This Device</div><div class="subtitle">Remove every profile and start from scratch</div></div></button>
           </div>
           <p class="footnote">${me?.sync?.gistId ? 'This profile syncs through GitHub. A backup file is still handy as an extra copy.' : 'This profile is stored on this device only. Turn on sync, or back up before switching phones or clearing your browser.'}</p>
         </section>
@@ -98,6 +99,20 @@ export const actions = {
     catch { toast(saved ? 'Backup file saved' : 'Could not save the backup here', { iconName: saved ? 'download' : 'info' }); }
   },
   'switch-to': (el) => { const p = getProfiles().find((x) => x.id === el.dataset.id); if (!p) return; closeSheet(true); switchProfile(p.id); toast(`Switched to ${p.name}`, { iconName: 'users' }); },
+  'reset-device': async () => {
+    const atRisk = getProfiles().filter((p) => hasUnsyncedData(p.id)).map((p) => p.name);
+    const synced = getProfiles().some((p) => p.sync?.gistId);
+    const message = [
+      'Every profile, plan, history and setting on this device is removed, along with saved GitHub tokens.',
+      synced ? 'Synced copies on GitHub are kept: bring them back with “Set Up from GitHub”.' : '',
+      atRisk.length ? `${atRisk.join(', ')} ${atRisk.length === 1 ? 'is' : 'are'} not synced, so that data will be lost for good.` : '',
+    ].filter(Boolean).join(' ');
+    const ok = await alertDialog({ title: 'Reset this device?', message, actions: [{ label: 'Cancel', value: false, style: 'gray' }, { label: 'Reset Device', value: true, style: 'danger' }] });
+    if (!ok) return;
+    resetDevice();
+    try { const keys = await caches.keys(); await Promise.all(keys.filter((k) => k.startsWith('reps-')).map((k) => caches.delete(k))); } catch { /* no cache storage */ }
+    location.reload();
+  },
   'erase-all': async () => {
     const me = activeProfile();
     const ok = await alertDialog({ title: `Erase ${me?.name || 'this profile'}’s data?`, message: me?.sync?.gistId ? 'This deletes the plan, history and settings here and on every synced device. It cannot be undone.' : 'This deletes the plan, history and settings from this device. It cannot be undone.', actions: [{ label: 'Cancel', value: false, style: 'gray' }, { label: 'Erase', value: true, style: 'danger' }] });
