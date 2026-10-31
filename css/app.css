@@ -1124,7 +1124,7 @@ button.widget:active { transform: scale(0.97); }
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .avatar.nav { width: 36px; height: 36px; font-size: 16px; }
-.avatar.row { width: 32px; height: 32px; font-size: 15px; }
+.avatar.av-row { width: 32px; height: 32px; font-size: 15px; }
 .avatar.lg { width: 60px; height: 60px; font-size: 26px; }
 .avatar.xl { width: 104px; height: 104px; font-size: 44px; }
 .avatar.add { background: var(--fill-3); color: var(--label-2); }

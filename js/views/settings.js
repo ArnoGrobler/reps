@@ -31,7 +31,7 @@ export function settingsView() {
         </button>` : ''}
         <section class="section"><div class="section-head"><div class="section-title">Profiles</div></div>
           <div class="list">
-            ${others.map((p) => `<button class="row has-icon" data-action="switch-to" data-id="${p.id}">${avatarHtml(p, 'row')}<div class="grow"><div class="title">Switch to ${esc(p.name)}</div></div>${icon('arrow-left-right', 'sm')}</button>`).join('')}
+            ${others.map((p) => `<button class="row has-icon" data-action="switch-to" data-id="${p.id}">${avatarHtml(p, 'av-row')}<div class="grow"><div class="title">Switch to ${esc(p.name)}</div></div>${icon('arrow-left-right', 'sm')}</button>`).join('')}
             <button class="row has-icon" data-action="open-profiles"><div class="row-icon" style="background:var(--indigo)">${icon('users')}</div><div class="grow title">${others.length ? 'All Profiles' : 'Add a Profile'}</div>${icon('chevron-right', 'chev')}</button>
           </div>
         </section>
