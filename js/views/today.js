@@ -23,7 +23,7 @@ export function renderToday(s) {
         <div class="onboard-icon">${icon('dumbbell')}</div>
         <div class="hero-title">Build your training plan</div>
         <p class="t-callout sec" style="margin:0">Pick your equipment, how many weeks, and how long you can train each day. Reps writes a week-by-week plan with sets, reps, rest and a demo video for every exercise.</p>
-        <button class="btn btn-filled lg block" data-action="open-wizard">${icon('sparkles', 'sm')} Create My Plan</button>
+        <button class="btn btn-filled lg block" data-action="open-wizard">Create My Plan</button>
       </div>
       ${widgets(s, today)}`,
     };
@@ -163,7 +163,7 @@ function upNextCards(s, today) {
       <div class="onboard-icon" style="background:color-mix(in srgb, var(--green) 16%, transparent);color:var(--green)">${icon('trophy')}</div>
       <div class="t-title2">Plan complete</div>
       <p class="t-callout sec" style="margin:0">You finished ${prog.done} of ${prog.total} workouts. Ready for the next block?</p>
-      <button class="btn btn-filled block" data-action="open-wizard">${icon('sparkles', 'sm')} Create New Plan</button>
+      <button class="btn btn-filled block" data-action="open-wizard">Create New Plan</button>
     </div>`);
   }
   return out.join('');

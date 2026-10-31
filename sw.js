@@ -1,11 +1,11 @@
 // Offline support: network first (so updates arrive right away), cache as fallback.
-const CACHE = 'reps-v1';
+const CACHE = 'reps-v2';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/icons.js', './js/ui.js', './js/store.js', './js/dates.js', './js/data.js',
-  './js/generator.js', './js/audio.js', './js/player.js', './js/wizard.js', './js/data/exercises.js',
+  './js/generator.js', './js/audio.js', './js/player.js', './js/wizard.js', './js/sync.js', './js/data/exercises.js',
   './js/views/today.js', './js/views/calendar.js', './js/views/plan.js', './js/views/library.js',
-  './js/views/day.js', './js/views/editor.js', './js/views/settings.js',
+  './js/views/day.js', './js/views/editor.js', './js/views/settings.js', './js/views/profiles.js', './js/views/sync.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
 ];
 

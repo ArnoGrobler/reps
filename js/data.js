@@ -57,3 +57,9 @@ export function youtubeSearchUrl(ex) {
 /** YouTube iframes are blocked inside the claude.ai preview sandbox (a framed page); they work on GitHub Pages. */
 const framed = (() => { try { return window.self !== window.top; } catch { return true; } })();
 export const canEmbedVideo = !framed && !/claude\.ai|claudeusercontent|anthropic/.test(location.hostname);
+
+/** Exercises the plan generator may use: everything except what this profile hid. */
+export function allowedExercises(settings) {
+  const hidden = new Set(settings?.hidden || []);
+  return hidden.size ? EXERCISES.filter((e) => !hidden.has(e.id)) : EXERCISES;
+}

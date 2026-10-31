@@ -94,6 +94,28 @@ function clearSession() {
   renderAccessory();
 }
 
+/** Before switching profile: pause and save the session under its own profile, then clear it from screen. */
+export function suspendForSwitch() {
+  if (S && S.phase !== 'select' && S.phase !== 'done') {
+    if (!S.paused) {
+      S.paused = true;
+      if (S.mode === 'timed') S.remainingMs = Math.max(0, S.phaseEndsAt - now());
+    }
+    persist();
+  }
+  stopLoop();
+  cue.stopSpeech();
+  cue.keepAwake(false);
+  if (el) {
+    el.remove();
+    el = null;
+    document.documentElement.style.overflow = '';
+    document.body.classList.remove('cover-open');
+  }
+  S = null;
+  renderAccessory();
+}
+
 export function restoreSession() {
   const saved = loadSession();
   if (!saved || !saved.steps?.length || saved.phase === 'done' || saved.phase === 'select') return;
@@ -385,8 +407,30 @@ function render() {
   if (S.phase === 'select') el.innerHTML = selectView();
   else if (S.phase === 'done') el.innerHTML = doneView();
   else el.innerHTML = runView(phaseClass);
+  fit();
   live();
 }
+
+/** Size the timer ring (or the own-pace number) to the space left, so Up Next and the controls never get pushed off screen. */
+function fit() {
+  const main = el?.querySelector('.pl-main');
+  const flex = main?.querySelector('.pl-ring-wrap, .pl-target');
+  if (!main || !flex) return;
+  const gap = parseFloat(getComputedStyle(main).rowGap) || 0;
+  const pad = parseFloat(getComputedStyle(main).paddingTop) + parseFloat(getComputedStyle(main).paddingBottom);
+  const kids = [...main.children];
+  const others = kids.filter((k) => k !== flex).reduce((h, k) => h + k.offsetHeight, 0);
+  const avail = main.clientHeight - pad - others - gap * (kids.length - 1) - 16;
+  const width = main.clientWidth - 40;
+  if (flex.classList.contains('pl-ring-wrap')) {
+    main.style.setProperty('--ring', `${Math.floor(Math.max(120, Math.min(avail, width * 0.8, 320)))}px`);
+  } else {
+    const extra = flex.offsetHeight - (flex.querySelector('.pl-big')?.offsetHeight || 0);
+    main.style.setProperty('--target-font', `${Math.floor(Math.max(56, Math.min((avail - extra) * 0.92, width * 0.36, 150)))}px`);
+  }
+}
+
+window.addEventListener('resize', () => { if (el && S && S.phase !== 'select' && S.phase !== 'done') fit(); });
 
 function topBar() {
   const work = S.steps.filter((x) => x.kind === 'work');
@@ -582,8 +626,8 @@ function live() {
     if (small) small.textContent = `of ${st.reps} reps · ${secs}s`;
     if (side) side.textContent = rep.side;
   } else {
-    if (big) big.textContent = secs >= 60 ? fmtDuration(secs) : secs;
-    if (small) small.textContent = S.phase === 'ready' ? 'seconds' : st.kind === 'rest' ? 'seconds rest' : `of ${st.duration}s${st.perSide ? ' each side' : ''}`;
+    if (big) { big.textContent = secs >= 60 ? fmtDuration(secs) : secs; big.classList.toggle('long', secs >= 60); }
+    if (small) small.textContent = S.phase === 'ready' ? 'seconds' : st.kind === 'rest' ? (secs >= 60 ? 'rest' : 'seconds rest') : `of ${st.duration}s${st.perSide ? ' each side' : ''}`;
     if (side) side.textContent = st.kind === 'work' && st.perSide ? (t - S.phaseStart < st.workSec * 500 ? 'Left side' : 'Right side') : '';
   }
   if (big) big.classList.toggle('pulse', secs <= 3 && !(S.phase === 'run' && st.kind === 'work' && st.mode === 'reps'));

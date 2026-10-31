@@ -432,12 +432,12 @@ export function regenerateDay(plan, key, exercises, { minutes, focus } = {}) {
   return realize(t, { wib: 0, block: 0, deload: false, minutes: m, exMap, equipment: plan.equipment });
 }
 
-/** Exercises that can replace exId: same movement pattern first, then shared muscles. */
-export function alternatives(exId, exercises, equipment) {
-  const ex = exercises.find((e) => e.id === exId);
+/** Exercises from `exercises` that can replace `source` (an exercise): same movement pattern first, then shared muscles. */
+export function alternatives(source, exercises, equipment) {
+  const ex = source;
   if (!ex) return [];
   return exercises
-    .filter((e) => e.id !== exId && canDo(e, equipment))
+    .filter((e) => e.id !== ex.id && canDo(e, equipment))
     .map((e) => ({ e, score: (e.pattern === ex.pattern ? 10 : 0) + e.muscles.filter((m) => ex.muscles.includes(m)).length * 2 - Math.abs(e.level - ex.level) }))
     .filter((x) => x.score >= 4)
     .sort((a, b) => b.score - a.score)
@@ -488,4 +488,35 @@ export function flatten(day, exMap) {
     if (steps[i].kind === 'work') next = i; else steps[i].next = next;
   }
   return steps;
+}
+
+/** Fit an item to a different exercise (switching reps/time when the new move needs it). */
+export function adaptItem(it, ex) {
+  it.exId = ex.id;
+  if (ex.type === 'time' && it.mode === 'reps') { it.mode = 'time'; it.duration = ex.defaults.duration ?? 30; }
+  if (ex.type === 'reps' && it.mode === 'time' && it.duration > 60) { it.mode = 'reps'; it.reps = ex.defaults.reps ?? 10; }
+  return it;
+}
+
+/** Replace oldId with newId in every workout from `fromKey` on that is not done. Returns how many workouts changed. */
+export function replaceInPlan(plan, oldId, newId, { fromKey, isDone, exMap }) {
+  let changed = 0;
+  for (const [k, d] of Object.entries(plan.days)) {
+    if (k < fromKey || d.type !== 'workout' || isDone(k)) continue;
+    let hit = false;
+    for (const b of d.blocks) for (const it of b.items) if (it.exId === oldId) { adaptItem(it, exMap[newId]); hit = true; }
+    if (!hit) continue;
+    changed++;
+    d.estSec = estimateSeconds(d, exMap);
+    if (!d.customTitle) d.title = titleFor(d, exMap, plan.equipment);
+  }
+  return changed;
+}
+
+/** Upcoming, not-done workouts that use an exercise. */
+export function upcomingUses(plan, exId, { fromKey, isDone }) {
+  if (!plan) return [];
+  return Object.entries(plan.days)
+    .filter(([k, d]) => k >= fromKey && d.type === 'workout' && !isDone(k) && d.blocks.some((b) => b.items.some((it) => it.exId === exId)))
+    .map(([k]) => k);
 }

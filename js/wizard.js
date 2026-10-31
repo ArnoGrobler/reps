@@ -3,7 +3,7 @@
 
 import { icon } from './icons.js';
 import { esc, segmented, switchHtml, stepperHtml, toast } from './ui.js';
-import { EXERCISES, EQUIPMENT, EQUIP_ICON, EQUIP_COLOR, EQ } from './data.js';
+import { EXERCISES, EQUIPMENT, EQUIP_ICON, EQUIP_COLOR, EQ, allowedExercises } from './data.js';
 import { todayKey, addDays, dow, fmtMonthDay, fmt, weekdayLetters, startOfWeek, fmtMinutes, LOCALE } from './dates.js';
 import { getState, update } from './store.js';
 import { generatePlan, GOALS, LEVELS, countExercises } from './generator.js';
@@ -69,7 +69,7 @@ function weeklyMinutes() { return wz.schedule.reduce((a, b) => a + b, 0); }
 
 function buildPreview() {
   const s = getState();
-  const plan = generatePlan({ goal: wz.goal, level: wz.level, weeks: wz.weeks, startDate: startDate(), equipment: wz.equipment, schedule: wz.schedule, seed: wz.seed }, EXERCISES);
+  const plan = generatePlan({ goal: wz.goal, level: wz.level, weeks: wz.weeks, startDate: startDate(), equipment: wz.equipment, schedule: wz.schedule, seed: wz.seed }, allowedExercises(s.settings));
   if (wz.fromPlan && s.plan) {
     // Keep the days that already happened exactly as they were.
     const t = todayKey();
@@ -99,7 +99,7 @@ function render() {
     <footer class="wiz-footer">
       ${wz.step < 4
         ? `<button class="btn lg glass glass-prominent glass-interactive wiz-cta" data-action="wiz-next" ${canNext ? '' : 'disabled'}>Continue ${icon('arrow-right', 'sm')}</button>`
-        : `<button class="btn lg glass glass-prominent glass-interactive wiz-cta" data-action="wiz-create">${icon('sparkles', 'sm')} ${wz.fromPlan ? 'Update Plan' : 'Create Plan'}</button>`}
+        : `<button class="btn lg glass glass-prominent glass-interactive wiz-cta" data-action="wiz-create">${wz.fromPlan ? 'Update Plan' : 'Create Plan'}</button>`}
     </footer>`;
   if (sameStep) el.scrollTop = top;
 }
@@ -254,7 +254,7 @@ export const actions = {
     update((s) => { s.plan = plan; });
     close();
     document.dispatchEvent(new CustomEvent('reps:plan-created'));
-    toast(editing ? 'Plan updated' : 'Plan created', { iconName: 'sparkles' });
+    toast(editing ? 'Plan updated' : 'Plan created', { iconName: 'circle-check' });
   },
 };
 

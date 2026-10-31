@@ -74,6 +74,7 @@ export function stopSpeech() {
 
 export function haptic(pattern = 12) {
   try {
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
     if (navigator.vibrate) { navigator.vibrate(pattern); return; }
     // iOS 18+ Safari gives a haptic tap when a switch-style checkbox toggles.
     if (!hapticLabel) {

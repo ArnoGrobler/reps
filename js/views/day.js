@@ -2,7 +2,7 @@
 
 import { icon } from '../icons.js';
 import { esc, openSheet, pushSheet, closeSheet, showMenu, alertDialog, toast } from '../ui.js';
-import { EX, EXERCISES, EQUIP_ICON, EQUIP_COLOR, mainEquip, rxText } from '../data.js';
+import { EX, allowedExercises, EQUIP_ICON, EQUIP_COLOR, mainEquip, rxText } from '../data.js';
 import { todayKey, fmtWeekday, fmtMonthDay, relativeLabel, fmtMinutes, dow } from '../dates.js';
 import { getState, update, getDay, isDone, dayStatus, weekIndexOf } from '../store.js';
 import { countExercises, estimateSeconds, regenerateDay, FOCUS } from '../generator.js';
@@ -106,14 +106,14 @@ export function toggleDone(key, { quiet = false } = {}) {
   const wasDone = isDone(key, s);
   const prev = s.log[key];
   update((st) => {
-    if (wasDone) delete st.log[key];
+    if (wasDone) st.log[key] = { completed: false, at: Date.now() };
     else st.log[key] = { completed: true, at: Date.now(), mode: 'manual', durationSec: day?.type === 'workout' ? (day.estSec || 0) : 0 };
   });
   if (quiet) return;
   const what = day?.type === 'rest' ? 'Rest day' : 'Workout';
   toast(wasDone ? `${what} marked not done` : `${what} complete`, {
     iconName: wasDone ? 'undo-2' : 'circle-check',
-    action: { label: 'Undo', onClick: () => update((st) => { if (prev) st.log[key] = prev; else delete st.log[key]; }) },
+    action: { label: 'Undo', onClick: () => update((st) => { st.log[key] = prev ? { ...prev, at: Date.now() } : { completed: false, at: Date.now() }; }) },
   });
 }
 
@@ -127,7 +127,7 @@ export async function setRestDay(key, rest) {
     update((st) => { st.plan.days[key] = { type: 'rest', title: 'Rest Day', note: 'Rest day you added. Recover well.', prev: day }; });
     toast('Changed to rest day', { iconName: 'moon' });
   } else {
-    const next = day.prev || regenerateDay(s.plan, key, EXERCISES, { minutes: s.plan.schedule[dow(key)] || 30 });
+    const next = day.prev || regenerateDay(s.plan, key, allowedExercises(s.settings), { minutes: s.plan.schedule[dow(key)] || 30 });
     update((st) => { st.plan.days[key] = next; });
     toast('Changed to workout day', { iconName: 'dumbbell' });
   }
@@ -162,7 +162,7 @@ export const actions = {
     else if (v === 'workout') setRestDay(key, false);
     else if (v === 'regen') {
       const old = day;
-      const next = regenerateDay(s.plan, key, EXERCISES);
+      const next = regenerateDay(s.plan, key, allowedExercises(s.settings));
       update((st) => { st.plan.days[key] = next; });
       toast('New workout created', { iconName: 'refresh-cw', action: { label: 'Undo', onClick: () => update((st) => { st.plan.days[key] = old; }) } });
     }

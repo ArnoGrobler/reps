@@ -1,8 +1,11 @@
-// Settings sheet: appearance, workout cues, plan shortcuts, backup.
+// Account sheet (opened from the avatar, top right): profile and switching, sync,
+// appearance, workout cues, plan shortcuts, backup.
 
 import { icon } from '../icons.js';
 import { esc, segmented, switchHtml, stepperHtml, closeSheet, alertDialog, toast } from '../ui.js';
-import { getState, update, replaceState, resetAll } from '../store.js';
+import { getState, update, replaceState, resetAll, activeProfile, getProfiles, switchProfile } from '../store.js';
+import { avatarHtml } from './profiles.js';
+import { syncSectionHtml } from './sync.js';
 import { openWizard } from '../wizard.js';
 import { EXERCISES } from '../data.js';
 
@@ -10,7 +13,7 @@ const ACCENTS = [['orange', 'Orange'], ['red', 'Red'], ['pink', 'Pink'], ['purpl
 
 export function settingsView() {
   return {
-    title: 'Settings',
+    get title() { return activeProfile()?.name || 'Settings'; },
     trailing: () => `<button class="icon-btn glass glass-prominent glass-interactive" data-sheet-close aria-label="Done">${icon('check')}</button>`,
     render: () => {
       const st = getState().settings;
@@ -18,7 +21,21 @@ export function settingsView() {
         <div class="row-icon" style="background:${color}">${icon(iconName)}</div>
         <div class="grow"><div class="title">${esc(label)}</div>${sub ? `<div class="subtitle">${esc(sub)}</div>` : ''}</div>
         ${switchHtml(`set:${id}`, st[id], label)}</div>`;
+      const me = activeProfile();
+      const others = getProfiles().filter((p) => p.id !== me?.id);
       return `
+        ${me ? `<button class="card account-card pressable" data-action="pf-edit-current">
+          ${avatarHtml(me, 'lg')}
+          <div class="grow" style="min-width:0"><div class="t-title3 truncate">${esc(me.name)}</div><div class="t-foot sec">Edit name, photo and color</div></div>
+          ${icon('chevron-right', 'chev')}
+        </button>` : ''}
+        <section class="section"><div class="section-head"><div class="section-title">Profiles</div></div>
+          <div class="list">
+            ${others.map((p) => `<button class="row has-icon" data-action="switch-to" data-id="${p.id}">${avatarHtml(p, 'row')}<div class="grow"><div class="title">Switch to ${esc(p.name)}</div></div>${icon('arrow-left-right', 'sm')}</button>`).join('')}
+            <button class="row has-icon" data-action="open-profiles"><div class="row-icon" style="background:var(--indigo)">${icon('users')}</div><div class="grow title">${others.length ? 'All Profiles' : 'Add a Profile'}</div>${icon('chevron-right', 'chev')}</button>
+          </div>
+        </section>
+        ${me ? syncSectionHtml(me.id) : ''}
         <section class="section"><div class="section-head"><div class="section-title">Appearance</div></div>
           <div class="list">
             <div class="row"><div class="grow title">Mode</div>${segmented('set:theme', [{ value: 'system', label: 'Auto' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }], st.theme, 'width:176px')}</div>
@@ -44,7 +61,7 @@ export function settingsView() {
         <section class="section"><div class="section-head"><div class="section-title">Plan</div></div>
           <div class="list">
             <button class="row has-icon" data-action="settings-edit-plan"><div class="row-icon" style="background:var(--indigo)">${icon('square-pen')}</div><div class="grow title">Edit Schedule &amp; Equipment</div>${icon('chevron-right', 'chev')}</button>
-            <button class="row has-icon" data-action="settings-new-plan"><div class="row-icon" style="background:var(--accent)">${icon('sparkles')}</div><div class="grow title">Create New Plan</div>${icon('chevron-right', 'chev')}</button>
+            <button class="row has-icon" data-action="settings-new-plan"><div class="row-icon" style="background:var(--accent)">${icon('plus')}</div><div class="grow title">Create New Plan</div>${icon('chevron-right', 'chev')}</button>
           </div>
         </section>
         <section class="section"><div class="section-head"><div class="section-title">Your Data</div></div>
@@ -52,9 +69,9 @@ export function settingsView() {
             <button class="row has-icon" data-action="backup-copy"><div class="row-icon" style="background:var(--green)">${icon('download')}</div><div class="grow"><div class="title">Back Up</div><div class="subtitle">Copy or save your plan and history</div></div></button>
             <label class="row has-icon tappable" for="restore-file"><div class="row-icon" style="background:var(--blue)">${icon('upload')}</div><div class="grow"><div class="title">Restore from Backup</div><div class="subtitle">Choose a .json backup file</div></div></label>
             <input type="file" id="restore-file" accept="application/json,.json" hidden>
-            <button class="row has-icon" data-action="erase-all"><div class="row-icon" style="background:var(--red)">${icon('trash-2')}</div><div class="grow title" style="color:var(--red)">Erase All Data</div></button>
+            <button class="row has-icon" data-action="erase-all"><div class="row-icon" style="background:var(--red)">${icon('trash-2')}</div><div class="grow title" style="color:var(--red)">Erase ${esc(me?.name || 'Profile')}’s Data</div></button>
           </div>
-          <p class="footnote">Everything is stored on this device only. Back up before switching phones or clearing your browser.</p>
+          <p class="footnote">${me?.sync?.gistId ? 'This profile syncs through GitHub. A backup file is still handy as an extra copy.' : 'This profile is stored on this device only. Turn on sync, or back up before switching phones or clearing your browser.'}</p>
         </section>
         <p class="footnote" style="text-align:center">Reps · ${EXERCISES.length} exercises · Icons by Lucide (ISC). Demo videos belong to their YouTube creators.</p>`;
     },
@@ -80,9 +97,11 @@ export const actions = {
     try { await navigator.clipboard.writeText(json); toast(saved ? 'Backup saved and copied' : 'Backup copied to clipboard', { iconName: 'download' }); }
     catch { toast(saved ? 'Backup file saved' : 'Could not save the backup here', { iconName: saved ? 'download' : 'info' }); }
   },
+  'switch-to': (el) => { const p = getProfiles().find((x) => x.id === el.dataset.id); if (!p) return; closeSheet(true); switchProfile(p.id); toast(`Switched to ${p.name}`, { iconName: 'users' }); },
   'erase-all': async () => {
-    const ok = await alertDialog({ title: 'Erase all data?', message: 'This deletes your plan, history and settings from this device. It cannot be undone.', actions: [{ label: 'Cancel', value: false, style: 'gray' }, { label: 'Erase', value: true, style: 'danger' }] });
-    if (ok) { resetAll(); closeSheet(); toast('All data erased', { iconName: 'trash-2' }); }
+    const me = activeProfile();
+    const ok = await alertDialog({ title: `Erase ${me?.name || 'this profile'}’s data?`, message: me?.sync?.gistId ? 'This deletes the plan, history and settings here and on every synced device. It cannot be undone.' : 'This deletes the plan, history and settings from this device. It cannot be undone.', actions: [{ label: 'Cancel', value: false, style: 'gray' }, { label: 'Erase', value: true, style: 'danger' }] });
+    if (ok) { resetAll(); closeSheet(); toast('Profile data erased', { iconName: 'trash-2' }); }
   },
 };
 

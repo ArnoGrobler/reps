@@ -5,7 +5,7 @@
 
 import { icon } from '../icons.js';
 import { esc, pushSheet, popSheet, segmented, stepperHtml, switchHtml, alertDialog, toast } from '../ui.js';
-import { EX, EXERCISES, EQUIP_ICON, EQUIP_COLOR, mainEquip, PATTERNS, titleCase } from '../data.js';
+import { EX, allowedExercises, EQUIP_ICON, EQUIP_COLOR, mainEquip, PATTERNS, titleCase } from '../data.js';
 import { fmtShort, dow, LOCALE } from '../dates.js';
 import { getState, update, getDay } from '../store.js';
 import { estimateSeconds, workSeconds, makeItem, alternatives, canDo, titleFor, regenerateDay } from '../generator.js';
@@ -137,8 +137,8 @@ function swapView() {
       const s = getState();
       const { item } = find(s);
       if (!item) return '';
-      const alts = alternatives(item.exId, EXERCISES, s.plan.equipment);
-      const others = EXERCISES.filter((e) => e.id !== item.exId && canDo(e, s.plan.equipment) && !alts.includes(e));
+      const alts = alternatives(EX[item.exId], allowedExercises(s.settings), s.plan.equipment);
+      const others = allowedExercises(s.settings).filter((e) => e.id !== item.exId && canDo(e, s.plan.equipment) && !alts.includes(e));
       const row = (e) => `<button class="row has-icon" data-action="ed-swap-to" data-ex="${e.id}">
         <div class="row-icon" style="background:${EQUIP_COLOR[mainEquip(e)]}">${icon(EQUIP_ICON[mainEquip(e)] || 'dumbbell')}</div>
         <div class="grow"><div class="title truncate">${esc(e.name)}</div><div class="subtitle truncate">${esc(PATTERNS[e.pattern])} · ${esc(e.muscles.map(titleCase).join(', '))}</div></div>
@@ -165,7 +165,7 @@ function addView() {
       if (!block) return '';
       const role = block.kind === 'warmup' ? 'warmup' : block.kind === 'cooldown' ? 'cooldown' : block.kind === 'finisher' ? 'finisher' : 'main';
       const q = ctx.addQuery.toLowerCase();
-      const list = EXERCISES.filter((e) => canDo(e, s.plan.equipment) && (!q || e.name.toLowerCase().includes(q) || e.muscles.some((m) => m.includes(q))));
+      const list = allowedExercises(s.settings).filter((e) => canDo(e, s.plan.equipment) && (!q || e.name.toLowerCase().includes(q) || e.muscles.some((m) => m.includes(q))));
       const fit = list.filter((e) => e.roles.includes(role));
       const rest = list.filter((e) => !e.roles.includes(role));
       const row = (e) => `<button class="row has-icon" data-action="ed-add-ex" data-ex="${e.id}">
@@ -263,7 +263,7 @@ export const actions = {
     if (!ok) return;
     const s = getState();
     const old = getDay(ctx.key, s);
-    const next = regenerateDay(s.plan, ctx.key, EXERCISES, { minutes: old.minutes, focus: old.focus });
+    const next = regenerateDay(s.plan, ctx.key, allowedExercises(s.settings), { minutes: old.minutes, focus: old.focus });
     update((st) => { st.plan.days[ctx.key] = next; });
     toast('New workout created', { iconName: 'refresh-cw', action: { label: 'Undo', onClick: () => update((st) => { st.plan.days[ctx.key] = old; }) } });
   },

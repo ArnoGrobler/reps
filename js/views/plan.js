@@ -18,7 +18,7 @@ export function renderPlan(s) {
       body: `${head}<div class="card empty">${icon('clipboard-list')}
         <div class="t-title3">No plan yet</div>
         <p class="t-sub sec" style="margin:0">Answer a few questions about your equipment and time, and Reps builds a plan for each week.</p>
-        <button class="btn btn-filled lg" data-action="open-wizard">${icon('sparkles', 'sm')} Create My Plan</button></div>`,
+        <button class="btn btn-filled lg" data-action="open-wizard">Create My Plan</button></div>`,
     };
   }
   const p = s.plan;
@@ -100,7 +100,7 @@ export const actions = {
   'plan-menu': async (el) => {
     const v = await showMenu(el, [
       { label: 'Edit Schedule & Equipment', icon: 'square-pen', value: 'edit' },
-      { label: 'Create New Plan', icon: 'sparkles', value: 'new' },
+      { label: 'Create New Plan', value: 'new' },
       { sep: true },
       { label: 'Delete Plan', icon: 'trash-2', value: 'delete', danger: true },
     ]);

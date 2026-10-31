@@ -13,7 +13,10 @@ A home workout planner and tracker with an iOS 26 Liquid Glass interface. Plain 
   - *Timed:* a get-ready countdown, a rep counter paced to each exercise, countdowns for work and rest, an up-next card, pause/previous/next, +15 s rest, voice cues and beeps. The screen stays on while it runs.
   - *Own pace:* one set at a time, with a big Next button.
   - You can minimise a workout to a mini-player above the tab bar. Finishing marks the day complete, and you can also mark any day done by hand.
-- **Exercise library.** 148 exercises, each with steps, coaching cues, muscles, and a YouTube demo that plays inside the app.
+- **Exercise library.** 148 exercises, each with steps, coaching cues, muscles, and a YouTube demo that plays inside the app. Swipe left on an exercise to stop it being suggested; if upcoming workouts use it, pick a replacement and those workouts are updated.
+- **Profiles.** "Who's training?" on first launch (and optionally every launch). Each person has their own plan, history, settings, photo and hidden exercises. The avatar at top right opens the account sheet and switches profiles.
+- **Sync across devices.** Each profile can sync to a secret GitHub Gist (see below).
+- **Gestures.** Press and slide along the tab bar to move a glass bubble between tabs; drag the workout mini-player up to open the full workout.
 
 ## Design rules (Apple HIG, Liquid Glass)
 
@@ -39,9 +42,21 @@ Then open http://localhost:8000. ES modules don't load from `file://`.
 3. After about a minute the app is live at `https://<your-username>.github.io/<repo-name>/`.
 4. On iPhone, open it in Safari, then tap **Share → Add to Home Screen** for a full-screen app.
 
-## Your data
+## Your data and sync
 
-Plans and history are stored in the browser's local storage on each device. Nothing is sent anywhere, so there is no sync between devices. Use **Settings → Back Up** to save a JSON file, and **Restore from Backup** to load it on another device.
+Each profile's plan, history and settings are stored in the browser on the device. To keep a profile the same on several devices:
+
+1. On GitHub, create a classic token with only the **gist** scope (Reps links straight to the page) and give it an expiry date.
+2. In Reps, tap your avatar → **Sync with GitHub** and paste the token.
+3. On another device, use **Set Up from GitHub** on the "Who's training?" screen with a token for the same account.
+
+How it works: each profile is one secret gist (`reps-profile.json`). Reps pulls when it opens, pushes a few seconds after a change, and works offline. The most recently changed plan and settings win; completed days merge day by day, so finishing a workout on one device and editing the plan on another keeps both.
+
+Limits to know:
+- A secret gist is unlisted, not encrypted. Anyone with its exact link could read the workout data.
+- The token is stored in the browser on each device. Give it only the gist scope and an expiry date.
+- Timestamps come from each device's clock, so a device with a badly wrong clock can win a conflict it shouldn't.
+- **Back Up / Restore** in the account sheet still saves a JSON file of the current profile.
 
 ## Project layout
 
@@ -53,8 +68,9 @@ js/app.js               Shell, tab routing, event delegation
 js/generator.js         Plan generator, progression, workout flattening
 js/player.js            Workout mode (timed and own pace)
 js/wizard.js            Plan setup flow
-js/store.js             State and local storage
-js/views/*.js           Today, Calendar, Plan, Library, Day sheet, Editor, Settings
+js/store.js             Profiles, per-profile state, local storage
+js/sync.js              GitHub Gist sync and merge
+js/views/*.js           Today, Calendar, Plan, Library, Day sheet, Editor, Settings, Profiles, Sync
 js/data/exercises.js    Exercise and equipment database
 js/icons.js             Lucide icons (generated)
 sw.js                   Offline cache (network first)
