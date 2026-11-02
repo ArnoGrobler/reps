@@ -2,9 +2,11 @@
 // edit sets/reps/time/rest, swap, reorder, add and remove exercises.
 // Edits save immediately and apply to that date only, except swaps, which can
 // also apply to the same workout in later weeks.
+// The item, swap and add views also edit a draft outside the plan (the wizard's
+// "Same Every Day" routine): see editDraftItem / addToDraft.
 
 import { icon } from '../icons.js';
-import { esc, pushSheet, popSheet, segmented, stepperHtml, switchHtml, alertDialog, toast } from '../ui.js';
+import { esc, openSheet, pushSheet, popSheet, refreshSheet, segmented, stepperHtml, switchHtml, alertDialog, toast } from '../ui.js';
 import { EX, allowedExercises, EQUIP_ICON, EQUIP_COLOR, mainEquip, PATTERNS, titleCase, perSideAmount } from '../data.js';
 import { fmtShort, dow, LOCALE } from '../dates.js';
 import { getState, update, getDay } from '../store.js';
@@ -12,10 +14,14 @@ import { estimateSeconds, workSeconds, makeItem, alternatives, canDo, titleFor, 
 import { itemRx, blockFormat, setRestDay } from './day.js';
 import { exerciseView } from './library.js';
 
-const ctx = { key: null, blockId: null, itemId: null, swapFuture: true, addQuery: '' };
+// src: a draft being edited instead of a plan day: { day: { blocks }, equipment, goal, level, load, onChange() }
+const ctx = { key: null, blockId: null, itemId: null, swapFuture: true, addQuery: '', src: null };
+
+const dayOf = (s = getState()) => (ctx.src ? ctx.src.day : getDay(ctx.key, s));
+const planOf = (s = getState()) => ctx.src || s.plan;
 
 function find(s = getState()) {
-  const day = getDay(ctx.key, s);
+  const day = dayOf(s);
   const block = day?.blocks?.find((b) => b.id === ctx.blockId);
   const item = block?.items.find((i) => i.id === ctx.itemId);
   return { day, block, item };
@@ -23,6 +29,7 @@ function find(s = getState()) {
 
 /** Run a mutation on the current day and refresh its derived fields. */
 function edit(fn) {
+  if (ctx.src) { fn(ctx.src.day, getState()); ctx.src.onChange?.(); refreshSheet(); return; }
   update((s) => {
     const day = getDay(ctx.key, s);
     if (!day) return;
@@ -39,9 +46,10 @@ export function dayEditorView(key) {
     title: 'Edit Workout',
     subtitle: fmtShort(key),
     trailing: () => `<button class="icon-btn glass glass-prominent glass-interactive" data-sheet-back aria-label="Done">${icon('check')}</button>`,
-    mount: () => { ctx.key = key; },
+    mount: () => { ctx.key = key; ctx.src = null; },
     render: () => {
       ctx.key = key;
+      ctx.src = null;
       const s = getState();
       const day = getDay(key, s);
       if (!day || day.type !== 'workout') return '<div class="card empty">This day is not a workout.</div>';
@@ -109,7 +117,7 @@ function itemEditorView() {
         <div class="list">
           <div class="row"><div class="grow title">Measure by</div>
             ${segmented('ed:mode', [{ value: 'reps', label: 'Reps' }, { value: 'time', label: 'Time' }], item.mode, 'width:150px')}</div>
-          ${circuit ? `<div class="row"><div class="grow"><div class="title">${block.pair ? 'Sets' : 'Rounds'}</div><div class="subtitle">${block.pair ? 'Set for the pair' : 'Set for the whole circuit'}</div></div><span class="detail">${block.rounds}</span></div>`
+          ${circuit ? `<div class="row"><div class="grow"><div class="title">${block.pair ? 'Sets' : 'Rounds'}</div><div class="subtitle">${block.pair ? `Set for the ${block.items.length > 2 ? 'tri-set' : 'pair'}` : 'Set for the whole circuit'}</div></div><span class="detail">${block.rounds}</span></div>`
             : `<div class="row"><div class="grow title">Sets</div><div class="value-stepper"><span class="val rounded">${item.sets}</span>${stepperHtml('ed:sets', { canDec: item.sets > 1, canInc: item.sets < 10, label: 'sets' })}</div></div>`}
           ${item.mode === 'reps'
             ? `<div class="row"><div class="grow"><div class="title">Reps</div>${perSideAmount(item, ex) ? `<div class="subtitle">Each side${ex.alternating ? ', alternating' : ''}</div>` : ''}</div><div class="value-stepper"><span class="val rounded">${item.reps}</span>${stepperHtml('ed:reps', { canDec: item.reps > 1, canInc: item.reps < 100, label: 'reps' })}</div></div>`
@@ -137,14 +145,15 @@ function swapView() {
       const s = getState();
       const { item } = find(s);
       if (!item) return '';
-      const alts = alternatives(EX[item.exId], allowedExercises(s.settings), s.plan.equipment);
-      const others = allowedExercises(s.settings).filter((e) => e.id !== item.exId && canDo(e, s.plan.equipment) && !alts.includes(e));
+      const equipment = planOf(s).equipment;
+      const alts = alternatives(EX[item.exId], allowedExercises(s.settings), equipment);
+      const others = allowedExercises(s.settings).filter((e) => e.id !== item.exId && canDo(e, equipment) && !alts.includes(e));
       const row = (e) => `<button class="row has-icon" data-action="ed-swap-to" data-ex="${e.id}">
         <div class="row-icon" style="background:${EQUIP_COLOR[mainEquip(e)]}">${icon(EQUIP_ICON[mainEquip(e)] || 'dumbbell')}</div>
         <div class="grow"><div class="title truncate">${esc(e.name)}</div><div class="subtitle truncate">${esc(PATTERNS[e.pattern])} · ${esc(e.muscles.map(titleCase).join(', '))}</div></div>
       </button>`;
       return `
-        <div class="list"><div class="row"><div class="grow"><div class="title">Also swap in later weeks</div><div class="subtitle">Same workout on future ${esc(new Intl.DateTimeFormat(LOCALE, { weekday: 'long' }).format(new Date(2026, 10, 1 + dow(ctx.key), 12)))}s</div></div>${switchHtml('ed:swapFuture', ctx.swapFuture, 'Also swap in later weeks')}</div></div>
+        ${ctx.src ? '' : `<div class="list"><div class="row"><div class="grow"><div class="title">Also swap in later weeks</div><div class="subtitle">Same workout on future ${esc(new Intl.DateTimeFormat(LOCALE, { weekday: 'long' }).format(new Date(2026, 10, 1 + dow(ctx.key), 12)))}s</div></div>${switchHtml('ed:swapFuture', ctx.swapFuture, 'Also swap in later weeks')}</div></div>`}
         <section class="section"><div class="section-head"><div class="section-title">Best Matches</div></div>
           <div class="list">${alts.slice(0, 12).map(row).join('') || '<div class="row sec">No close matches with your equipment.</div>'}</div></section>
         <section class="section"><div class="section-head"><div class="section-title">Everything Else</div></div>
@@ -165,7 +174,7 @@ function addView() {
       if (!block) return '';
       const role = block.kind === 'warmup' ? 'warmup' : block.kind === 'cooldown' ? 'cooldown' : block.kind === 'finisher' ? 'finisher' : 'main';
       const q = ctx.addQuery.toLowerCase();
-      const list = allowedExercises(s.settings).filter((e) => canDo(e, s.plan.equipment) && (!q || e.name.toLowerCase().includes(q) || e.muscles.some((m) => m.includes(q))));
+      const list = allowedExercises(s.settings).filter((e) => canDo(e, planOf(s).equipment) && (!q || e.name.toLowerCase().includes(q) || e.muscles.some((m) => m.includes(q))));
       const fit = list.filter((e) => e.roles.includes(role));
       const rest = list.filter((e) => !e.roles.includes(role));
       const row = (e) => `<button class="row has-icon" data-action="ed-add-ex" data-ex="${e.id}">
@@ -222,6 +231,12 @@ export const actions = {
       if (ne.type === 'reps' && it.mode === 'time' && it.duration > 60) { it.mode = 'reps'; it.reps = ne.defaults.reps ?? 10; }
     };
     let changed = 0;
+    if (ctx.src) {
+      edit((day) => { adapt(day.blocks.find((x) => x.id === ctx.blockId).items.find((x) => x.id === ctx.itemId)); });
+      popSheet();
+      toast(`Swapped to ${ne.name}`, { iconName: 'shuffle' });
+      return;
+    }
     update((s) => {
       const day = getDay(ctx.key, s);
       const b = day.blocks.find((x) => x.id === ctx.blockId);
@@ -245,12 +260,13 @@ export const actions = {
   },
   'ed-add-ex': (el) => {
     const ex = EX[el.dataset.ex];
-    const s = getState();
+    const p = planOf();
     edit((day) => {
       const b = day.blocks.find((x) => x.id === ctx.blockId);
       const kind = b.kind === 'warmup' || b.kind === 'cooldown' ? b.kind : 'main';
-      const it = makeItem(ex, { goal: s.plan.goal, level: s.plan.level, load: s.plan.load || 'moderate', kind });
-      if (b.format === 'circuit' && kind === 'main' && b.items[0]) {
+      const it = makeItem(ex, { goal: p.goal, level: p.level, load: p.load || 'moderate', kind });
+      if (b.pair && b.items[0]) { it.rest = b.items[0].rest; it.sets = 1; }   // pairs and tri-sets keep reps; the block sets the sets
+      else if (b.format === 'circuit' && kind === 'main' && b.items[0]) {
         it.mode = 'time'; it.duration = b.items[0].duration; it.rest = b.items[0].rest; it.sets = 1;
       }
       b.items.push(it);
@@ -325,6 +341,18 @@ export function onInput(e) {
     return true;
   }
   return false;
+}
+
+/** Edit one exercise of a draft workout that is not in the plan yet. */
+export function editDraftItem(src, blockId, itemId) {
+  Object.assign(ctx, { src, blockId, itemId });
+  openSheet(itemEditorView(), { detent: 'large', onClose: () => { ctx.src = null; } });
+}
+
+/** Add an exercise to a block of a draft workout. */
+export function addToDraft(src, blockId) {
+  Object.assign(ctx, { src, blockId, addQuery: '' });
+  openSheet(addView(), { detent: 'large', onClose: () => { ctx.src = null; } });
 }
 
 export { exerciseView };

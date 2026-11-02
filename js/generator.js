@@ -34,6 +34,8 @@ export const FOCUS = {
   conditioning: { name: 'Conditioning', patterns: ['full', 'cardio', 'squat', 'core', 'hinge', 'push_h', 'lunge', 'cardio'] },
   core: { name: 'Core', patterns: ['core', 'core', 'core', 'core', 'core', 'core'] },
   recovery: { name: 'Mobility', patterns: ['mobility', 'stretch', 'mobility', 'stretch', 'mobility', 'stretch', 'mobility', 'stretch'] },
+  // "Same Every Day" plans: one full-body workout with a leg, push and pull move first
+  ppl: { name: 'Push Pull Legs', patterns: ['squat', 'push_h', 'pull_h', 'hinge', 'push_v', 'pull_h', 'lunge', 'core'] },
 };
 
 // Time-saving pairs: moves that do not compete for the same muscles (§1 "Time saver") [27][31].
@@ -41,6 +43,8 @@ const PAIRS = {
   full: [['squat', 'pull_h'], ['hinge', 'push_h'], ['lunge', 'push_v'], ['carry', 'core']],
   lower: [['squat', 'core'], ['hinge', 'core'], ['lunge', 'carry']],
   upper: [['push_h', 'pull_h'], ['push_v', 'pull_h'], ['pull_v', 'core']],
+  // Tri-sets so even a short session covers legs, push and pull; each move rests the others' muscles
+  ppl: [['squat', 'push_h', 'pull_h'], ['hinge', 'push_v', 'pull_h'], ['lunge', 'core', 'pull_v']],
 };
 
 const SPLITS = {
@@ -446,7 +450,7 @@ function pairedStrength({ blocks, focus, budget, used, opts, pick, ctx, exMap, l
     const items = pairs[p].map((pattern) => pick(pattern, 'main', ctx)).filter(Boolean).map((ex) => ({ ...makeItem(ex, opts), rest: PAIR_REST }));
     if (!items.length) continue;
     const sets = Math.max(...items.map((it) => it.sets));
-    const b = blockOf({ kind: 'main', name: `Pair ${String.fromCharCode(65 + blocks.length)}`, format: 'circuit', pair: true, rounds: sets, roundRest: PAIR_REST, items });
+    const b = blockOf({ kind: 'main', name: `${items.length > 2 ? 'Tri-Set' : 'Pair'} ${String.fromCharCode(65 + blocks.length)}`, format: 'circuit', pair: true, rounds: sets, roundRest: PAIR_REST, items });
     const cost = estimateSeconds({ type: 'workout', blocks: [b] }, exMap);
     if (cost > left) {
       const perRound = cost / b.rounds;
@@ -470,7 +474,7 @@ function pairedStrength({ blocks, focus, budget, used, opts, pick, ctx, exMap, l
 function straightStrength({ blocks, focus, budget, used, opts, pick, ctx, exMap, level, goal, minutes }) {
   const main = blockOf({ kind: 'main', name: 'Strength', format: 'straight', items: [] });
   blocks.push(main);
-  const wantsFinisher = goal === 'balanced' && minutes >= 30;
+  const wantsFinisher = goal === 'balanced' && minutes >= 30 && focus !== 'ppl';
   const reserve = wantsFinisher ? Math.min(360, budget * 0.18) : 0;
   const patterns = FOCUS[focus].patterns;
   const maxItems = 6;
@@ -601,13 +605,15 @@ function restDay(i) {
 /* ---------- Public API ---------- */
 
 /**
- * opts: { goal, level, load, weeks, startDate, equipment[], schedule[7] (minutes by weekday, 0 = rest), seed? }
+ * opts: { goal, level, load, weeks, startDate, equipment[], schedule[7] (minutes by weekday, 0 = rest), seed?,
+ *         style?: 'varied' | 'same', routine? (for 'same': the daily workout to repeat) }
  */
 export function generatePlan(opts, exercises) {
   const exMap = indexExercises(exercises);
   const { goal, level, weeks, startDate, equipment, schedule } = opts;
   const load = opts.load || 'moderate';
   const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
+  if (opts.style === 'same') return samePlan({ ...opts, load, seed }, exercises, exMap);
 
   const slots = [];
   for (let j = 0; j < 7; j++) {
@@ -650,6 +656,69 @@ export function generatePlan(opts, exercises) {
     name: `${weeks}-Week ${GOALS[goal]?.label || ''} Plan`.replace('  ', ' '),
     createdAt: new Date().toISOString(),
     startDate, weeks, goal, level, load, equipment: [...equipment], schedule: [...schedule], seed,
+    days,
+  };
+}
+
+/**
+ * "Same Every Day" plans: one full-body workout covering legs, push and pull, sized to the daily time.
+ * Returns { focus, blocks }, copied unchanged onto every training day (and editable in the wizard).
+ */
+export function dailyRoutine({ goal, level, load = 'moderate', equipment, minutes, seed }, exercises) {
+  const exMap = indexExercises(exercises);
+  const t = buildTemplate({ focus: 'ppl', minutes, goal, level, load, equipment, exercises, exMap, rng: mulberry32(seed), week: new Map(), slot: 0 });
+  const day = realize(t, { w: 0, wib: 0, block: 0, deload: false, minutes, exMap, equipment, level, load });
+  return { focus: 'ppl', blocks: day.blocks };
+}
+
+/** Which of legs, push and pull a workout covers (for the routine screen). */
+export function pplCoverage(blocks, exMap) {
+  const has = { legs: false, push: false, pull: false };
+  for (const b of blocks) {
+    if (b.kind !== 'main' && b.kind !== 'finisher') continue;
+    for (const it of b.items) {
+      const p = exMap[it.exId]?.pattern;
+      if (p === 'squat' || p === 'hinge' || p === 'lunge') has.legs = true;
+      if (p === 'push_h' || p === 'push_v') has.push = true;
+      if (p === 'pull_h' || p === 'pull_v') has.pull = true;
+    }
+  }
+  return has;
+}
+
+/** A training day of a "Same Every Day" plan: an exact copy of the routine, no weekly changes. */
+function routineDay(routine, { minutes, exMap, equipment, level, load, backToBack }) {
+  const blocks = routine.blocks.map((b) => ({ ...b, id: uid('b'), items: b.items.map((it) => ({ ...it, id: uid('i') })) }));
+  const day = { type: 'workout', focus: routine.focus || 'ppl', minutes, blocks, deload: false };
+  // Same muscles again within 24 h: ACSM suggests about 48 h before training them hard again (§1 "Sessions per week") [3]
+  const effort = backToBack
+    ? { short: 'Leave 2–3 reps in the tank', text: 'You train the same muscles again tomorrow, so stop each set with 2–3 reps left. That keeps you fresh for the next session.' }
+    : effortFor({ level, load, deload: false, week: 2, focus: 'full' });
+  day.effort = effort.text;
+  day.effortShort = effort.short;
+  day.title = titleFor(day, exMap, equipment);
+  day.estSec = estimateSeconds(day, exMap);
+  return day;
+}
+
+/** "Same Every Day": the routine (given, or generated for the daily time) on every training day. */
+function samePlan({ goal, level, load, weeks, startDate, equipment, schedule, seed, routine }, exercises, exMap) {
+  const minutes = Math.max(...schedule) || 30;
+  const r = routine || dailyRoutine({ goal, level, load, equipment, minutes, seed }, exercises);
+  const backToBack = schedule.some((m, d) => m > 0 && schedule[(d + 1) % 7] > 0);
+  const days = {};
+  let rests = 0;
+  for (let i = 0; i < weeks * 7; i++) {
+    const key = addDays(startDate, i);
+    const m = schedule[dow(key)];
+    days[key] = m > 0 ? routineDay(r, { minutes: m, exMap, equipment, level, load, backToBack }) : restDay(rests++);
+  }
+  return {
+    id: uid('p'),
+    name: `${weeks}-Week Daily Full Body`,
+    createdAt: new Date().toISOString(),
+    startDate, weeks, goal, level, load, equipment: [...equipment], schedule: [...schedule], seed,
+    style: 'same', routine: r,
     days,
   };
 }

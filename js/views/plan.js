@@ -45,6 +45,7 @@ export function renderPlan(s) {
         <div class="chips">
           <span class="tag accent">${icon(GOALS[p.goal]?.icon || 'activity')}${esc(GOALS[p.goal]?.label || p.goal)}</span>
           <span class="tag">${icon('gauge')}${esc(LEVELS[p.level])}</span>
+          ${p.style === 'same' ? `<span class="tag">${icon('repeat')}Same every day</span>` : ''}
           ${p.equipment.some((q) => q === 'kettlebell' || q === 'dumbbells') ? `<span class="tag">${icon('weight')}${esc(LOADS[p.load || 'moderate'].label)} weights</span>` : ''}
           ${p.equipment.map((q) => `<span class="tag">${icon(EQUIP_ICON[q] || 'dumbbell')}${esc(EQ[q]?.name || q)}</span>`).join('')}
         </div>
