@@ -1,7 +1,7 @@
 // Exercise library access and display helpers.
 
 /** Shown in the account sheet so it's easy to tell which version a device runs. */
-export const VERSION = '2026.11.02.5';
+export const VERSION = '2026.11.02.6';
 
 import { EXERCISES, EQUIPMENT } from './data/exercises.js';
 import { perSideAmount } from './generator.js';

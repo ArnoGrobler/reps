@@ -566,7 +566,7 @@ function selectView() {
       <button class="mode-btn" data-action="pl-mode" data-mode="paced">
         <span class="mode-icon">${icon('hand')}</span>
         <span class="mode-label">Own Pace</span>
-        <span class="mode-sub">One set at a time. Tap Next when you are ready.</span>
+        <span class="mode-sub">Tap Done after each set. Rests count down on their own.</span>
       </button>
     </div>
     <div class="pl-outline">
