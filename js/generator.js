@@ -244,6 +244,42 @@ function chooser(exercises, { equipment, level, rng }) {
   };
 }
 
+/** Order cool-down holds kneeling → lying → final rest, so you only get down to the floor once. */
+function sortFlow(items, exMap) {
+  return items.sort((a, b) => (exMap[a.exId]?.flow ?? 99) - (exMap[b.exId]?.flow ?? 99));
+}
+
+/**
+ * Plans made before the yoga cool-downs: swap the plain stretches in upcoming, not-done cool-downs
+ * for yoga holds. Seeded by date, so every device makes the same swap. Returns how many days changed.
+ */
+export function yogaCooldowns(plan, exercises, { fromKey, isDone }) {
+  const exMap = indexExercises(exercises);
+  const equipment = plan.equipment || ['bodyweight'];
+  const pool = exercises.filter((e) => e.yoga && e.pattern === 'stretch' && e.roles.includes('cooldown') && canDo(e, equipment));
+  let changed = 0;
+  for (const [k, d] of Object.entries(plan.days)) {
+    if (k < fromKey || d.type !== 'workout' || isDone(k)) continue;
+    const b = d.blocks.find((x) => x.kind === 'cooldown');
+    if (!b || b.items.every((it) => exMap[it.exId]?.yoga)) continue;
+    const rng = mulberry32([...k].reduce((h, c) => h * 31 + c.charCodeAt(0), 7));
+    const used = new Set(b.items.map((it) => it.exId));
+    for (const it of b.items) {
+      if (exMap[it.exId]?.yoga) continue;
+      const options = pool.filter((e) => !used.has(e.id) && e.level <= (plan.level || 2));
+      if (!options.length) break;
+      const ex = options[Math.floor(rng() * options.length)];
+      used.add(ex.id);
+      it.exId = ex.id;
+      it.mode = 'time';
+    }
+    sortFlow(b.items, exMap);
+    d.estSec = estimateSeconds(d, exMap);
+    changed++;
+  }
+  return changed;
+}
+
 /** Rest after a circuit move: at least 15 s if the next move needs different equipment. */
 function withTransitions(items, exMap) {
   items.forEach((it, i) => {
@@ -261,6 +297,7 @@ const blockOf = (fields) => ({ id: uid('b'), rounds: 1, roundRest: 0, ...fields,
 
 function buildTemplate({ focus, minutes, goal, level, load, equipment, exercises, exMap, rng, week, slot }) {
   const pick = chooser(exercises, { equipment, level, rng });
+  const pickYoga = chooser(exercises.filter((e) => e.yoga), { equipment, level, rng });
   const ctx = { session: new Set(), week, equipUse: {} };
   const budget = minutes * 60;
   const opts = { goal, level, load };
@@ -294,14 +331,17 @@ function buildTemplate({ focus, minutes, goal, level, load, equipment, exercises
     warm.push(it);
     t += workSeconds(it, ex) + it.rest;
   }
+  // Cool-down holds come from the yoga poses (pigeon, happy baby, bridge, Katonah-style restoratives),
+  // falling back to plain stretches only if those are hidden or used up
   const cool = [];
   for (let i = 0, t = 0; t < coolSec - 20 && i < 6; i++) {
-    const ex = pick('stretch', 'cooldown', ctx);
+    const ex = pickYoga('stretch', 'cooldown', ctx) || pick('stretch', 'cooldown', ctx);
     if (!ex) break;
     const it = makeItem(ex, { ...opts, kind: 'cooldown' });
     cool.push(it);
     t += workSeconds(it, ex) + it.rest;
   }
+  sortFlow(cool, exMap);
   const warmBlock = blockOf({ kind: 'warmup', name: 'Warm-Up', format: 'circuit', items: warm });
   const coolBlock = blockOf({ kind: 'cooldown', name: 'Cool-Down (optional)', format: 'circuit', optional: true, items: cool });
   const fixed = () => estimateSeconds({ type: 'workout', blocks: [warmBlock, coolBlock] }, exMap);

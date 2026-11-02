@@ -116,7 +116,7 @@ export function scienceView() {
     ['Short sessions', 'On days of 30 minutes or less, moves are done in alternating pairs (supersets), which save time with similar results.', 'Iversen 2021; Zhang 2025'],
     ['Weekly volume', 'At least 4 hard sets per body region a week for beginners, 10 or more for intermediate and advanced.', 'ACSM 2026'],
     ['Warm-up', '3–5 minutes of dynamic moves with 10 s to switch, then a lighter ramp-up set before the first loaded move.', 'Iversen 2021'],
-    ['Cool-down', 'Optional. Stretching after training does not reduce soreness or speed recovery, but helps flexibility.', 'ACSM 2011; Afonso 2021'],
+    ['Cool-down', 'Optional. Stretching after training does not reduce soreness or speed recovery, but helps flexibility. Holds are yoga poses such as pigeon, happy baby, bridge and Katonah-style restoratives, 30 s each.', 'ACSM 2011; Afonso 2021; poses: Michaan 2017 (practitioner)'],
     ['Progression', 'Add a rep each week inside your range. At the top of the range, move to a heavier weight or harder variation.', 'ACSM 2009; Plotkin 2022'],
     ['Deload', 'Intermediate and advanced plans get a lighter week every 4th week: fewer sets, stop 3–4 reps early.', 'Rogerson 2024 (coach consensus)'],
     ['Conditioning', 'Circuits use tested formats: 30 s / 30 s for beginners, 40/20 intermediate, 45/15 advanced, plus the proven workouts.', 'Ajjimaporn 2023; Lake & Lauder 2012'],
@@ -126,7 +126,7 @@ export function scienceView() {
     render: () => `
       <p class="t-callout sec" style="margin:0">Reps sets sets, reps, rest and progression from position stands, systematic reviews and published training studies. Each source was checked at PubMed or the publisher.</p>
       <div class="list">${rules.map(([t, d, src]) => `<div class="row" style="align-items:flex-start"><div class="grow"><div class="title">${esc(t)}</div><div class="subtitle" style="white-space:normal">${esc(d)}</div><div class="t-foot ter" style="margin-top:4px">${esc(src)}</div></div></div>`).join('')}</div>
-      <a class="btn btn-gray block" href="${DOC_URL}" target="_blank" rel="noopener">${icon('external-link', 'sm')} Full evidence and 63 references</a>
+      <a class="btn btn-gray block" href="${DOC_URL}" target="_blank" rel="noopener">${icon('external-link', 'sm')} Full evidence and 64 references</a>
       <p class="footnote">Most training studies are in young adults, often men. Where there is no direct trial (warm-up length, transition time, deload timing), Reps uses expert consensus and says so in the full document.</p>`,
   };
 }

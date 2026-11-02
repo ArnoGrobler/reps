@@ -135,6 +135,7 @@ export function mergeStates(local, remote) {
       planAt: Math.max(lm.planAt || 0, rm.planAt || 0),
       settingsAt: Math.max(lm.settingsAt || 0, rm.settingsAt || 0),
       logResetAt: resetAt,
+      cooldowns: Math.max(lm.cooldowns || 0, rm.cooldowns || 0),   // one-time plan upgrade already done
     },
   };
 }

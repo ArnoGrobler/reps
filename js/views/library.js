@@ -33,7 +33,8 @@ function matches(e, hidden) {
   else if (ui.equip !== 'all' && !e.equipment.includes(ui.equip)) return false;
   if (!ui.q) return true;
   const q = ui.q.toLowerCase();
-  return e.name.toLowerCase().includes(q) || e.muscles.some((m) => m.includes(q)) || (PATTERNS[e.pattern] || '').toLowerCase().includes(q);
+  return e.name.toLowerCase().includes(q) || e.muscles.some((m) => m.includes(q)) || (PATTERNS[e.pattern] || '').toLowerCase().includes(q)
+    || (e.yoga && ('yoga katonah cool-down'.includes(q) || q === 'cooldown'));
 }
 
 function results(s) {
@@ -137,6 +138,7 @@ export function exerciseView(exId, { extraTop = '' } = {}) {
       if (!ex) return '<div class="card empty">This exercise is no longer in the library.</div>';
       const tags = [
         ...ex.equipment.map((q) => `<span class="tag">${icon(EQUIP_ICON[q] || 'dumbbell')}${esc(EQ[q]?.name || titleCase(q))}</span>`),
+        ex.yoga ? `<span class="tag">${icon('leaf')}Yoga</span>` : '',
         `<span class="tag">${icon('gauge')}${esc(LEVELS[ex.level])}</span>`,
         ex.perSide ? `<span class="tag">${icon('arrow-left-right')}${ex.alternating ? 'Alternating' : 'Each side'}</span>` : '',
         `<span class="tag">${icon(ex.type === 'time' ? 'timer' : 'repeat')}${ex.type === 'time' ? `${ex.defaults.duration ?? 30} s` : `${ex.defaults.reps ?? 10} reps`} default</span>`,

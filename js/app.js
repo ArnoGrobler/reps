@@ -2,7 +2,7 @@
 // global event delegation, theme, profiles, sync and the workout accessory.
 
 import { icon } from './icons.js';
-import { getState, subscribe, activeProfile, getRegistry, onBeforeSwitch, onAfterSwitch } from './store.js';
+import { getState, update, isDone, subscribe, activeProfile, getRegistry, onBeforeSwitch, onAfterSwitch } from './store.js';
 import { refreshSheet, openSheet, closeSheet, toast } from './ui.js';
 import { renderToday } from './views/today.js';
 import { renderCalendar, actions as calendarActions } from './views/calendar.js';
@@ -18,6 +18,9 @@ import * as profiles from './views/profiles.js';
 import * as syncViews from './views/sync.js';
 import * as proven from './views/proven.js';
 import { startAutoSync, syncProfile } from './sync.js';
+import { yogaCooldowns } from './generator.js';
+import { allowedExercises } from './data.js';
+import { todayKey } from './dates.js';
 
 const TABS = [
   { id: 'today', label: 'Today', icon: 'house', render: renderToday },
@@ -282,11 +285,22 @@ subscribe((s) => {
   profiles.refreshProfiles();
 });
 
+/** One-time upgrade per profile: plans made before the yoga cool-downs get them on upcoming days. */
+function upgradeCooldowns() {
+  const s = getState();
+  if (!s.plan || (s.meta.cooldowns || 0) >= 2) return;
+  update((st) => {
+    yogaCooldowns(st.plan, allowedExercises(st.settings), { fromKey: todayKey(), isDone: (k) => isDone(k, st) });
+    st.meta.cooldowns = 2;
+  });
+}
+
 // Switching profile: park the running workout under the old profile, then load the new one.
 onBeforeSwitch(() => { player.suspendForSwitch(); closeSheet(true); });
 onAfterSwitch(() => {
   resetPlanUi();
   player.restoreSession();
+  upgradeCooldowns();
   renderAccessory();
   window.scrollTo(0, 0);
   syncProfile();
@@ -296,6 +310,7 @@ shell();
 bind();
 applyTheme(getState());
 player.restoreSession();
+upgradeCooldowns();
 renderPage();
 renderAccessory();
 
