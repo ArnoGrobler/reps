@@ -512,7 +512,7 @@ function fit() {
   const avail = main.clientHeight - pad - others - gap * (kids.length - 1) - 16;
   const width = main.clientWidth - 40;
   // The set rail sits to the left of the ring; leave room for it on both sides so the ring stays centred
-  const rail = stage.querySelector('.pl-rail');
+  const rail = el.querySelector('.pl-rail');
   // Room for the rail is kept even on steps without one, so the ring does not jump in size between exercises
   const roomForRail = main.clientWidth - 2 * (RAIL_WIDTH + 12);
   if (flex.classList.contains('pl-ring-wrap')) {
@@ -521,8 +521,17 @@ function fit() {
     const extra = flex.offsetHeight - (flex.querySelector('.pl-big')?.offsetHeight || 0);
     main.style.setProperty('--target-font', `${Math.floor(Math.max(56, Math.min((avail - extra) * 0.92, width * 0.36, 150)))}px`);
   }
-  // The rail sits flush with the left edge of the screen
-  if (rail) rail.style.left = `${el.getBoundingClientRect().left - stage.getBoundingClientRect().left}px`;
+  // The rail is pinned to the left edge between a fixed point under the header (clear of a
+  // two-line exercise name) and the Up Next card, so it stays put from one step to the next
+  if (rail) {
+    const run = rail.parentElement.getBoundingClientRect();
+    const head = el.querySelector('.pl-top')?.getBoundingClientRect();
+    const next = el.querySelector('.pl-next')?.getBoundingClientRect();
+    const top = (head ? head.bottom - run.top : 60) + RAIL_TOP;
+    const bottom = (next ? next.top - run.top : run.height - 160) - 14;
+    rail.style.top = `${Math.round(top)}px`;
+    rail.style.height = `${Math.round(Math.max(170, bottom - top))}px`;
+  }
   // Keep the current pill in view
   const list = rail?.querySelector('.rl-list');
   const cur = list?.querySelector('.cur, .next');
@@ -598,12 +607,13 @@ function runView(phase) {
   const c = 2 * Math.PI * r;
   return `<div class="pl-run">
     ${topBar()}
+    ${railHtml()}
     <main class="pl-main">
       <div class="pl-phase"><span>${esc(label)}</span>${S.paused ? '<span class="pl-paused">Paused</span>' : ''}</div>
       <h1 class="pl-name balance">${esc(name)}</h1>
       <div class="pl-sub">${esc(sub)}</div>
       ${effortLine(st, isReady)}
-      <div class="pl-stage">${railHtml()}
+      <div class="pl-stage">
       <div class="pl-ring-wrap">
         <svg class="pl-ring" viewBox="0 0 ${size} ${size}" aria-hidden="true">
           <circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="pl-ring-track"/>
@@ -657,7 +667,8 @@ function upNext() {
   }
   if (!target) return `<div class="pl-next"><div class="eyebrow">${label}</div><div class="pl-next-row"><span class="pl-next-icon done">${icon('flag')}</span><div class="grow"><div class="t-headline">Finish</div><div class="t-foot sec">Last exercise of the workout</div></div></div></div>`;
   const ex = EX[target.exId];
-  const when = target.round != null ? setLabel(target) : target.sets > 1 ? `${target.sets} sets` : target.block;
+  // Which set (or round) it is when the move has several: "Set 1 of 3", "Round 2 of 3"
+  const when = target.sets > 1 ? setLabel(target) : target.block;
   return `<div class="pl-next"><div class="eyebrow">${label}</div>
     <div class="pl-next-row"><span class="pl-next-icon">${icon(EQUIP_ICON[mainEquip(ex)] || 'dumbbell')}</span>
       <div class="grow" style="min-width:0"><div class="t-headline truncate">${esc(target.name)}</div>
@@ -666,7 +677,9 @@ function upNext() {
 
 /* ---------- Set rail ---------- */
 
+const restText = (sec) => (sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : `${sec}s`);
 const RAIL_WIDTH = 62;   // matches .pl-rail in app.css
+const RAIL_TOP = 176;    // below the header: phase label, two-line name and subtitle fit above the rail
 
 /** done / cur (on screen) / next (the set coming after a rest, or the first one) / todo */
 function railState(i) {
@@ -701,10 +714,11 @@ function railHtml() {
     const s = railState(x.i);
     return `<div class="rl-pill ${s}" role="listitem" aria-label="${esc(aria)}${s === 'done' ? ', done' : s === 'cur' ? ', now' : ''}">${s === 'done' ? icon('check') : esc(text)}</div>`;
   };
+  // The rest between two sets or rounds: a line with its time on it
   const link = (a, b) => {
-    const rest = group.find((x) => x.i > a.i && x.i < b.i);
+    const rest = group.find((x) => x.i > a.i && x.i < b.i && x.st.kind === 'rest');
     const s = rest ? railState(rest.i) : ['done', 'cur'].includes(railState(b.i)) ? 'done' : 'todo';
-    return `<i class="rl-link ${s}" aria-hidden="true"></i>`;
+    return `<div class="rl-link ${s}" role="presentation">${rest ? `<span>${restText(rest.st.sec)}</span>` : ''}</div>`;
   };
   let html;
   if (!rounds) {
@@ -736,7 +750,7 @@ function railHtml() {
   const canRemove = total > Math.max(1, ready ? 1 : anchor.set);
   return `<div class="pl-rail glass">
     <button class="rl-btn" data-action="pl-sets" data-delta="-1" aria-label="Remove a ${unit}" ${canRemove ? '' : 'disabled'}>${icon('minus')}</button>
-    <div class="rl-list" role="list" aria-label="${rounds ? `${word}s` : 'Sets'}">${html}</div>
+    <div class="rl-list" role="list" aria-label="${rounds ? `${word}s` : 'Sets'}"><div class="rl-track">${html}</div></div>
     <button class="rl-btn" data-action="pl-sets" data-delta="1" aria-label="Add a ${unit}" ${total >= 20 ? 'disabled' : ''}>${icon('plus')}</button>
   </div>`;
 }
@@ -789,13 +803,14 @@ function pacedView(st) {
   const timerOn = !!(S.pacedEndsAt || S.pacedRemaining != null);
   return `<div class="pl-run paced">
     ${topBar()}
+    ${railHtml()}
     <main class="pl-main">
       <div class="pl-phase"><span>${esc(st.block)}</span>${S.paused ? '<span class="pl-paused">Paused</span>' : ''}</div>
       <h1 class="pl-name balance">${esc(st.name)}</h1>
       ${st.ramp ? '<div class="pl-sub">Light ramp-up set: about half effort</div>' : st.sets > 1 ? `<div class="pl-sub">${esc(setLabel(st))}</div>` : ''}
       ${effortLine(st, false)}
       ${st.atTop && st.set === st.sets ? '<div class="pl-hint">Top of your rep range. Next time, go heavier or pick a harder variation.</div>' : ''}
-      <div class="pl-stage">${railHtml()}
+      <div class="pl-stage">
       <div class="pl-target">
         ${timerOn
           ? `<div class="pl-big rounded num" data-pl-big>0</div><div class="pl-small" data-pl-small>seconds left</div>`

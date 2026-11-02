@@ -1023,7 +1023,7 @@ button.widget:active { transform: scale(0.97); }
 .pl-outline-block { background: var(--bg-elev); border-radius: 22px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
 .pl-outline-item { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
 
-.pl-run { overflow: hidden; }
+.pl-run { overflow: hidden; position: relative; }
 .pl-main {
   flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
   padding: 8px max(20px, env(safe-area-inset-right, 0px)) 16px max(20px, env(safe-area-inset-left, 0px));
@@ -1059,17 +1059,19 @@ button.widget:active { transform: scale(0.97); }
 
 /* Set rail: a glass panel on the left edge with the sets (or rounds) of what's on screen */
 .pl-stage { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.paced .pl-stage { min-height: 210px; width: min(230px, calc(100% - 140px)); }
+.paced .pl-stage { min-height: 210px; }
 .pl-rail {
-  /* fit() sets left so the panel is flush with the screen edge; it reaches down beside the How to / +15 s row */
-  position: absolute; left: -100px; top: -6px; bottom: -52px; z-index: 1;
-  width: calc(62px + env(safe-area-inset-left, 0px)); padding: 10px 6px 10px max(4px, env(safe-area-inset-left, 0px));
-  border-radius: 0 31px 31px 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  /* Flush with the left edge; fit() pins top and height so it stays put between steps */
+  position: absolute; left: 0; top: 240px; height: 300px; z-index: 2;
+  width: calc(62px + env(safe-area-inset-left, 0px)); padding: 12px 6px 12px max(4px, env(safe-area-inset-left, 0px));
+  border-radius: 0 31px 31px 0; display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 .rl-list {
   position: relative; flex: 1; min-height: 0; width: 100%; overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain;
-  display: flex; flex-direction: column; align-items: center; padding: 6px 0;
+  display: flex; flex-direction: column;
 }
+/* Centred when it fits, scrolls from the top when it does not */
+.rl-track { margin: auto 0; display: flex; flex-direction: column; align-items: center; padding: 4px 0; }
 .rl-list::-webkit-scrollbar { display: none; }
 .rl-btn {
   width: 36px; height: 36px; border-radius: 50%; flex: none; display: grid; place-items: center;
@@ -1079,7 +1081,7 @@ button.widget:active { transform: scale(0.97); }
 .rl-btn .ic { width: 17px; height: 17px; stroke-width: 2.6; }
 .rl-btn:disabled { opacity: 0.3; }
 .rl-pill {
-  position: relative; width: 42px; height: 42px; border-radius: 50%; flex: none;
+  position: relative; width: 40px; height: 40px; border-radius: 50%; flex: none;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   font-size: 16px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
   background: color-mix(in srgb, var(--label) 7%, transparent); color: var(--label-2);
@@ -1094,19 +1096,25 @@ button.widget:active { transform: scale(0.97); }
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
   70%, 100% { box-shadow: 0 0 0 10px transparent; }
 }
-/* The break between two sets */
-.rl-link { display: block; flex: none; width: 3px; height: 12px; margin: 4px 0; border-radius: 2px; background: color-mix(in srgb, var(--label) 14%, transparent); transition: background-color 0.35s, height 0.5s var(--spring); }
-.rl-link.done { background: var(--green); }
-.rl-link.cur { height: 18px; background: var(--rest); animation: rl-breathe 1.6s ease-in-out infinite; }
+/* The rest between two sets or rounds: a line with the time sitting on it */
+.rl-link {
+  --line: color-mix(in srgb, var(--label) 16%, transparent);
+  flex: none; height: 38px; margin: 3px 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 10px; font-weight: 700; line-height: 12px; font-variant-numeric: tabular-nums; color: var(--label-2);
+}
+.rl-link::before, .rl-link::after { content: ''; flex: 1; width: 3px; border-radius: 2px; background: var(--line); transition: background-color 0.35s; }
+.rl-link.done { --line: var(--green); color: var(--label-3); }
+.rl-link.cur { --line: var(--rest); color: var(--label); }
+.rl-link.cur::before, .rl-link.cur::after { animation: rl-breathe 1.6s ease-in-out infinite; }
 @keyframes rl-breathe { 50% { opacity: 0.4; } }
 .rl-round { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: none; }
 .rl-round.opening { animation: rl-open 0.5s var(--spring); transform-origin: top center; }
 @keyframes rl-open { from { opacity: 0; transform: scaleY(0.6); } }
-.rl-round .rl-pill { width: 38px; height: 38px; font-size: 15px; }
+.rl-round .rl-pill { width: 36px; height: 36px; font-size: 15px; }
 .rl-cap { font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; color: var(--label-2); }
 .rl-word { font-size: 7.5px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 2px; }
 .rl-fold { font-size: 15px; }
-@media (prefers-reduced-motion: reduce) { .rl-pill::after, .rl-link.cur, .rl-round.opening { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .rl-pill::after, .rl-link.cur::before, .rl-link.cur::after, .rl-round.opening { animation: none !important; } }
 .pl-rest-actions { display: flex; gap: 10px; }
 .pl-next {
   width: 100%; max-width: 480px; margin-top: auto; padding: 14px 16px; border-radius: 24px; background: var(--bg-elev);
@@ -1265,4 +1273,4 @@ button.widget:active { transform: scale(0.97); }
 .vol-row { display: grid; grid-template-columns: 110px 1fr 28px; align-items: center; gap: 10px; font-size: 15px; }
 .vol-num { text-align: right; font-weight: 700; }
 .pl-effort { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--label-2); background: var(--fill-4); padding: 4px 10px; border-radius: 999px; }
-.pl-hint { font-size: 14px; line-height: 19px; color: var(--accent); max-width: 320px; }
+.pl-hint { font-size: 14px; line-height: 19px; color: var(--accent); max-width: 240px; }   /* clear of the set rail */
