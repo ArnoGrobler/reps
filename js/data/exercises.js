@@ -445,7 +445,7 @@ export const EXERCISES = [
   },
   {
     id: "pigeon-stretch",
-    name: "Pigeon Pose",
+    name: "Pigeon",
     yoga: true,
     flow: 30,
     equipment: ["bodyweight"],
@@ -608,7 +608,7 @@ export const EXERCISES = [
   },
   {
     id: "supine-twist",
-    name: "Supine Spinal Twist",
+    name: "Lying Twist",
     yoga: true,
     flow: 80,
     equipment: ["bodyweight"],
@@ -637,7 +637,7 @@ export const EXERCISES = [
   },
   {
     id: "hero-cow-face-arms",
-    name: "Hero Pose with Cow-Face Arms",
+    name: "Kneeling Shoulder Stretch",
     yoga: true,
     flow: 10,
     equipment: ["bodyweight"],
@@ -649,7 +649,7 @@ export const EXERCISES = [
     tempo: 1,
     defaults: { duration: 30 },
     roles: ["cooldown"],
-    description: "A kneeling seat (hero pose, a base posture in Katonah Yoga) with one hand reaching down the back and the other reaching up to meet it. Stretches the shoulders and triceps.",
+    description: "Kneel and sit back, then reach one hand down your back and the other up from below to meet it. Stretches the shoulders and triceps. The kneeling seat is a base position in Katonah Yoga.",
     steps: [
       "Kneel and sit back on your heels, or on a block or cushion placed between your feet.",
       "Reach your right arm up, bend the elbow and let the hand drop between your shoulder blades.",
@@ -666,7 +666,7 @@ export const EXERCISES = [
   },
   {
     id: "reclined-hero",
-    name: "Reclined Hero",
+    name: "Kneeling Lean-Back",
     yoga: true,
     flow: 40,
     equipment: ["bodyweight"],
@@ -678,7 +678,7 @@ export const EXERCISES = [
     tempo: 1,
     defaults: { duration: 30 },
     roles: ["cooldown"],
-    description: "Supta virasana: from a kneeling seat, lean back to stretch the quads, hip flexors and the fronts of the ankles. A staple of Katonah Yoga practice; blocks make it accessible.",
+    description: "Sit between your heels and lean back to stretch the quads, hip flexors and the fronts of the ankles. A staple of Katonah Yoga; blocks under your back make it easier.",
     steps: [
       "Kneel with your knees together and feet just wider than your hips, tops of the feet down, and sit between your heels (on a block if your hips do not reach the floor).",
       "Lean back onto your hands, then onto your forearms.",
@@ -688,14 +688,14 @@ export const EXERCISES = [
     cues: [
       "Stop at the height where the knees feel easy, never painful",
       "Keep the knees from drifting apart",
-      "Skip it if you have knee problems and do Bridge Pose instead",
+      "Skip it if you have knee problems and do the Bridge Hold instead",
     ],
     video: { youtubeId: "kzQvZksDnFQ", title: "How to do Supta Virasana - Reclining Hero Pose", channel: "Yoga & You" },
     source: null,
   },
   {
     id: "bridge-pose",
-    name: "Bridge Pose",
+    name: "Bridge Hold",
     yoga: true,
     flow: 50,
     equipment: ["bodyweight"],
@@ -707,12 +707,12 @@ export const EXERCISES = [
     tempo: 1,
     defaults: { duration: 30 },
     roles: ["cooldown"],
-    description: "A gentle backbend from the floor that opens the fronts of the hips and the chest. With a block under the sacrum it becomes a restful supported hold, as in Katonah Yoga's restorative practice.",
+    description: "A gentle backbend from the floor that opens the fronts of the hips and the chest. With a block under the base of your spine it becomes a restful hold, as in Katonah Yoga's restorative practice.",
     steps: [
       "Lie on your back with knees bent, feet flat and hip-width apart, heels about a hand's length from your hips.",
       "Press through your feet and lift your hips until your body forms a line from knees to shoulders.",
       "Rest your arms on the floor, or clasp your hands underneath you and roll the shoulders in.",
-      "Breathe and hold. For a restful version, slide a yoga block or firm cushion under your sacrum and let your weight settle onto it.",
+      "Breathe and hold. For a restful version, slide a yoga block or firm cushion under the base of your spine and let your weight settle onto it.",
     ],
     cues: [
       "Keep the knees pointing forward, not falling out",
@@ -724,7 +724,7 @@ export const EXERCISES = [
   },
   {
     id: "supported-fish",
-    name: "Supported Fish",
+    name: "Block Under Upper Back",
     yoga: true,
     flow: 60,
     equipment: ["bodyweight"],
@@ -775,7 +775,7 @@ export const EXERCISES = [
     cues: [
       "Hold behind the thighs or use a strap if your feet are out of reach",
       "Keep the back of the neck long",
-      "Let the sacrum stay on the floor",
+      "Keep the base of your spine on the floor",
     ],
     video: { youtubeId: "DsuQQMzFU-4", title: "How to Do the Happy Baby Pose: A Guide from Physical Therapists", channel: "Hinge Health" },
     source: null,
@@ -811,7 +811,7 @@ export const EXERCISES = [
   },
   {
     id: "stir-the-pot",
-    name: "Stir the Pot",
+    name: "Hip Circles on All Fours",
     yoga: true,
     flow: 6,
     equipment: ["bodyweight"],
