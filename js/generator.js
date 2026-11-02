@@ -736,37 +736,43 @@ export function weeklySets(plan, weekStartKey, exMap) {
 }
 
 /** Expand a day into a linear list of steps for the workout player. */
+/**
+ * The workout as a list of steps: work, rest, work, ...
+ * Every step carries bi/ii/set (block index in day.blocks, item index, set or round number) and g,
+ * the group the player's set rail shows: one exercise's sets, or all rounds of a circuit or pair.
+ */
 export function flatten(day, exMap) {
   const steps = [];
-  const blocks = day.blocks.filter((b) => b.items.length);
+  const blocks = day.blocks.map((b, bi) => ({ b, bi })).filter(({ b }) => b.items.length);
   let exerciseNo = 0;
-  const exerciseTotal = blocks.reduce((s, b) => s + b.items.length, 0);
-  blocks.forEach((b, bi) => {
-    const lastBlock = bi === blocks.length - 1;
-    const push = (it, extra) => {
+  const exerciseTotal = blocks.reduce((s, { b }) => s + b.items.length, 0);
+  blocks.forEach(({ b, bi }, n) => {
+    const lastBlock = n === blocks.length - 1;
+    const circuitFmt = b.format === 'circuit';
+    const push = (it, ii, extra) => {
       const ex = exMap[it.exId];
       steps.push({
         kind: 'work', exId: it.exId, name: ex?.name || it.exId, perSide: perSideAmount(it, ex), alternating: !!ex?.alternating, oneSide: !!it.oneSide,
         mode: it.mode, reps: it.reps, duration: it.duration, workSec: workSeconds(it, ex), ramp: !!it.ramp, atTop: !!it.atTop,
-        block: b.name, blockKind: b.kind, pair: !!b.pair, ...extra,
+        block: b.name, blockKind: b.kind, pair: !!b.pair, bi, ii, g: circuitFmt ? `b${bi}` : `b${bi}i${ii}`, ...extra,
       });
     };
-    const restStep = (sec, { long = false, between = false } = {}) => {
+    const restStep = (sec, ii, set, { long = false, between = false } = {}) => {
       const label = b.restLabel || (long ? 'Round Rest' : between || sec <= 20 ? 'Transition' : 'Rest');
-      steps.push({ kind: 'rest', sec, long, label, active: !!b.restLabel });
+      steps.push({ kind: 'rest', sec, long, label, active: !!b.restLabel, bi, ii, set, round: circuitFmt ? set : undefined, g: circuitFmt ? `b${bi}` : `b${bi}i${ii}` });
     };
-    if (b.format === 'circuit') {
+    if (circuitFmt) {
       const base = exerciseNo;
       for (let r = 1; r <= b.rounds; r++) {
         b.items.forEach((it, ii) => {
-          push(it, { round: r, rounds: b.rounds, set: r, sets: b.rounds, exerciseNo: base + ii + 1, exerciseTotal, circuit: !b.pair });
+          push(it, ii, { round: r, rounds: b.rounds, set: r, sets: b.rounds, exerciseNo: base + ii + 1, exerciseTotal, circuit: !b.pair, items: b.items.length });
           const lastInRound = ii === b.items.length - 1;
           const finalStep = lastInRound && r === b.rounds;
           let rest;
           if (!lastInRound) rest = it.rest;
           else if (r < b.rounds) rest = Math.max(b.roundRest || 0, it.rest || 0);
           else rest = lastBlock ? (b.restLabel ? it.rest : 0) : Math.max(20, it.rest || 0);
-          if (rest > 0) restStep(rest, { long: lastInRound && r < b.rounds && (b.roundRest || 0) > (it.rest || 0), between: finalStep && !lastBlock && rest <= 20 });
+          if (rest > 0) restStep(rest, ii, r, { long: lastInRound && r < b.rounds && (b.roundRest || 0) > (it.rest || 0), between: finalStep && !lastBlock && rest <= 20 });
         });
       }
       exerciseNo += b.items.length;
@@ -774,9 +780,9 @@ export function flatten(day, exMap) {
       b.items.forEach((it, ii) => {
         exerciseNo++;
         for (let s = 1; s <= it.sets; s++) {
-          push(it, { set: s, sets: it.sets, exerciseNo, exerciseTotal });
+          push(it, ii, { set: s, sets: it.sets, exerciseNo, exerciseTotal });
           const last = lastBlock && ii === b.items.length - 1 && s === it.sets;
-          if (!last && it.rest > 0) restStep(it.rest);
+          if (!last && it.rest > 0) restStep(it.rest, ii, s);
         }
       });
     }

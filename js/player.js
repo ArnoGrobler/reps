@@ -27,6 +27,8 @@ const resting = () => S.steps[S.i]?.kind === 'rest';
 const onPhaseClock = () => S.mode === 'timed' || resting();
 const countdownRunning = () => onPhaseClock() || !!S.pacedEndsAt;
 const workLeftAfter = (i) => S.steps.slice(i + 1).some((x) => x.kind === 'work');
+/** Workout time is wall-clock time since you started: pauses count too. */
+const elapsedMs = () => (S?.startedAt ? Math.max(0, now() - S.startedAt) : 0);
 
 /* ---------- Session lifecycle ---------- */
 
@@ -44,7 +46,7 @@ export async function startWorkout(key) {
   if (S && S.key === key && S.phase !== 'done') { show(); return; }
   const day = getDay(key);
   if (!day || day.type !== 'workout') return;
-  S = { key, title: day.title, phase: 'select', mode: null, steps: [], i: 0, paused: false, activeMs: 0, startedAt: 0 };
+  S = { key, title: day.title, phase: 'select', mode: null, steps: [], i: 0, paused: false, startedAt: 0 };
   show();
 }
 
@@ -58,7 +60,6 @@ function begin(mode) {
   S.i = 0;
   S.startedAt = now();
   S.lastTick = now();
-  S.activeMs = 0;
   S.paused = false;
   if (!S.steps.length) { toast('This workout has no exercises yet', { iconName: 'info' }); return; }
   if (settings().wakeLock) cue.keepAwake(true);
@@ -82,7 +83,7 @@ function finish(early = false) {
   const reps = work.reduce((n, s) => n + (s.mode === 'reps' ? (s.reps || 0) * (s.perSide ? 2 : 1) : 0), 0);
   const sets = work.filter((s) => s.blockKind === 'main' || s.blockKind === 'finisher').length;
   S.phase = 'done';
-  S.summary = { durationSec: Math.round(S.activeMs / 1000), reps, sets, exercises: countExercises(day) };
+  S.summary = { durationSec: Math.round(elapsedMs() / 1000), reps, sets, exercises: countExercises(day) };
   update((s) => {
     s.log[S.key] = { completed: true, at: now(), mode: S.mode, durationSec: S.summary.durationSec, sets, reps };
   });
@@ -270,7 +271,6 @@ function pacedTick(t) {
 function tick() {
   if (!S || S.phase === 'select' || S.phase === 'done') return;
   const t = now();
-  if (!S.paused) S.activeMs += t - (S.lastTick || t);
   S.lastTick = t;
   if (S.paused) { live(); return; }
   if (S.mode !== 'timed') { pacedTick(t); return; }
@@ -502,20 +502,28 @@ function render() {
 /** Size the timer ring (or the own-pace number) to the space left, so Up Next and the controls never get pushed off screen. */
 function fit() {
   const main = el?.querySelector('.pl-main');
-  const flex = main?.querySelector('.pl-ring-wrap, .pl-target');
+  const stage = main?.querySelector('.pl-stage');
+  const flex = stage?.querySelector('.pl-ring-wrap, .pl-target');
   if (!main || !flex) return;
   const gap = parseFloat(getComputedStyle(main).rowGap) || 0;
   const pad = parseFloat(getComputedStyle(main).paddingTop) + parseFloat(getComputedStyle(main).paddingBottom);
   const kids = [...main.children];
-  const others = kids.filter((k) => k !== flex).reduce((h, k) => h + k.offsetHeight, 0);
+  const others = kids.filter((k) => k !== stage).reduce((h, k) => h + k.offsetHeight, 0);
   const avail = main.clientHeight - pad - others - gap * (kids.length - 1) - 16;
   const width = main.clientWidth - 40;
+  // The set rail sits to the left of the ring; leave room for it on both sides so the ring stays centred
+  const rail = stage.querySelector('.pl-rail');
+  const roomForRail = rail ? main.clientWidth - 2 * (rail.offsetWidth + 14) : Infinity;
   if (flex.classList.contains('pl-ring-wrap')) {
-    main.style.setProperty('--ring', `${Math.floor(Math.max(120, Math.min(avail, width * 0.8, 320)))}px`);
+    main.style.setProperty('--ring', `${Math.floor(Math.max(120, Math.min(avail, width * 0.8, roomForRail, 320)))}px`);
   } else {
     const extra = flex.offsetHeight - (flex.querySelector('.pl-big')?.offsetHeight || 0);
     main.style.setProperty('--target-font', `${Math.floor(Math.max(56, Math.min((avail - extra) * 0.92, width * 0.36, 150)))}px`);
   }
+  // Keep the current pill in view
+  const list = rail?.querySelector('.rl-list');
+  const cur = list?.querySelector('.cur, .next');
+  if (list && cur) list.scrollTop = Math.max(0, cur.offsetTop - list.clientHeight / 2 + cur.offsetHeight / 2);
 }
 
 window.addEventListener('resize', () => { if (el && S && S.phase !== 'select' && S.phase !== 'done') fit(); });
@@ -529,7 +537,7 @@ function topBar() {
     <button class="icon-btn glass glass-interactive" data-action="pl-min" aria-label="Minimise workout">${icon('chevron-down')}</button>
     <div class="pl-head-mid">
       <div class="pl-bar"><i data-pl-progress style="width:${Math.round(progress() * 100)}%"></i></div>
-      <div class="pl-head-label"><span>${exNo ? `Exercise ${exNo} of ${exTotal}` : esc(S.title)}</span><span class="pl-clock" aria-label="Workout time">${icon('timer', 'xs')}<span class="num" data-pl-elapsed>${fmtDuration(S.activeMs / 1000)}</span></span></div>
+      <div class="pl-head-label"><span>${exNo ? `Exercise ${exNo} of ${exTotal}` : esc(S.title)}</span><span class="pl-clock" aria-label="Workout time">${icon('timer', 'xs')}<span class="num" data-pl-elapsed>${fmtDuration(elapsedMs() / 1000)}</span></span></div>
     </div>
     <div class="pl-top-actions">${muteButton()}<button class="toolbar-pill glass glass-interactive" data-action="pl-end">End</button></div>
   </header>`;
@@ -592,6 +600,7 @@ function runView(phase) {
       <h1 class="pl-name balance">${esc(name)}</h1>
       <div class="pl-sub">${esc(sub)}</div>
       ${effortLine(st, isReady)}
+      <div class="pl-stage">${railHtml()}
       <div class="pl-ring-wrap">
         <svg class="pl-ring" viewBox="0 0 ${size} ${size}" aria-hidden="true">
           <circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="pl-ring-track"/>
@@ -602,6 +611,7 @@ function runView(phase) {
           <div class="pl-small" data-pl-small></div>
           <div class="pl-side" data-pl-side></div>
         </div>
+      </div>
       </div>
       ${!isReady && st.kind === 'work' ? `<button class="toolbar-pill glass glass-interactive pl-howto" data-action="pl-howto" data-ex="${st.exId}">${icon('circle-play', 'sm')} How to</button>`
         : st?.kind === 'rest' ? `<div class="pl-rest-actions"><button class="toolbar-pill glass glass-interactive" data-action="pl-add" data-sec="15">+15 s</button>${work ? `<button class="toolbar-pill glass glass-interactive" data-action="pl-howto" data-ex="${work.exId}">${icon('circle-play', 'sm')} Preview</button>` : ''}</div>` : '<div style="height:44px"></div>'}
@@ -627,19 +637,129 @@ function pacedControls(st) {
   </footer>`;
 }
 
+/**
+ * The next different exercise. More sets of the one on screen show in the set rail instead.
+ * During a rest the screen already says what comes next, so this card reads "And Next".
+ */
 function upNext() {
-  // The next work step that is a different set/exercise from what's on screen now
   const st = S.steps[S.i];
-  let j = S.phase === 'ready' ? 0 : S.i + 1;
-  if (st?.kind === 'rest' && S.phase !== 'ready') j = (st.next ?? S.i) + 1;
+  const ready = S.phase === 'ready';
+  const label = !ready && st?.kind === 'rest' ? 'And Next' : 'Up Next';
   let target = null;
-  for (; j < S.steps.length; j++) if (S.steps[j].kind === 'work') { target = S.steps[j]; break; }
-  if (!target) return `<div class="pl-next"><div class="eyebrow">Up Next</div><div class="pl-next-row"><span class="pl-next-icon done">${icon('flag')}</span><div class="grow"><div class="t-headline">Finish</div><div class="t-foot sec">Last set of the workout</div></div></div></div>`;
+  if (ready) target = S.steps[0];
+  else {
+    const shown = st.kind === 'work' ? S.i : st.next;
+    const exId = S.steps[shown]?.exId;
+    for (let j = (shown ?? S.i) + 1; j < S.steps.length; j++) if (S.steps[j].kind === 'work' && S.steps[j].exId !== exId) { target = S.steps[j]; break; }
+  }
+  if (!target) return `<div class="pl-next"><div class="eyebrow">${label}</div><div class="pl-next-row"><span class="pl-next-icon done">${icon('flag')}</span><div class="grow"><div class="t-headline">Finish</div><div class="t-foot sec">Last exercise of the workout</div></div></div></div>`;
   const ex = EX[target.exId];
-  return `<div class="pl-next"><div class="eyebrow">Up Next</div>
+  const when = target.round != null ? setLabel(target) : target.sets > 1 ? `${target.sets} sets` : target.block;
+  return `<div class="pl-next"><div class="eyebrow">${label}</div>
     <div class="pl-next-row"><span class="pl-next-icon">${icon(EQUIP_ICON[mainEquip(ex)] || 'dumbbell')}</span>
       <div class="grow" style="min-width:0"><div class="t-headline truncate">${esc(target.name)}</div>
-      <div class="t-foot sec">${esc(setLabel(target))} · ${esc(amountShort(target))}</div></div></div></div>`;
+      <div class="t-foot sec">${esc(when)} · ${esc(amountShort(target))}</div></div></div></div>`;
+}
+
+/* ---------- Set rail ---------- */
+
+const restText = (sec) => (sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : `${sec}s`);
+
+/** done / cur (on screen) / next (the set coming after a rest, or the first one) / todo */
+function railState(i) {
+  if (S.phase === 'ready') return i === 0 ? 'next' : 'todo';
+  if (i < S.i) return 'done';
+  if (i === S.i) return 'cur';
+  return S.steps[S.i].kind === 'rest' && S.steps[S.i].next === i ? 'next' : 'todo';
+}
+
+/**
+ * Pills beside the timer for the group on screen: one exercise's sets with the rests between,
+ * or a circuit/pair as rounds. The current round is open to show its moves (A, B, C…); finished
+ * rounds fold into a green tick. − and + remove or add a set (or round) for this workout.
+ */
+function railHtml() {
+  const anchor = S.phase === 'ready' ? S.steps[0] : S.steps[S.i];
+  if (!anchor?.g) return '';   // sessions saved before the rail have no groups
+  const list = [];
+  S.steps.forEach((st, i) => { if (st.g === anchor.g) list.push({ st, i }); });
+  // Only the breaks in between: the rest after the last set leads to the next exercise, so it shows only while you are on it
+  while (list.length && list[list.length - 1].st.kind === 'rest' && list[list.length - 1].i !== S.i) list.pop();
+  const first = list.find((x) => x.st.kind === 'work')?.st;
+  if (!first) return '';
+  const rounds = first.round != null && first.items > 1;   // circuits and pairs with several moves
+  const word = first.circuit ? 'Round' : 'Set';
+  const pill = ({ st, i }, text, aria) => {
+    const s = railState(i);
+    if (st.kind === 'rest') {
+      return `<div class="rl-rest ${s}" role="listitem" aria-label="${st.sec} seconds ${esc(st.label.toLowerCase())}${s === 'done' ? ', done' : ''}">${s === 'done' ? icon('check') : restText(st.sec)}</div>`;
+    }
+    return `<div class="rl-set ${s}" role="listitem" aria-label="${esc(aria)}${s === 'done' ? ', done' : s === 'cur' ? ', now' : ''}">${s === 'done' ? icon('check') : esc(text)}</div>`;
+  };
+  let html;
+  if (!rounds) {
+    html = list.map((x) => pill(x, String(x.st.set), `${x.st.round != null ? word : 'Set'} ${x.st.set}`)).join('');
+  } else {
+    const byRound = [];
+    for (const x of list) (byRound[x.st.round - 1] ||= []).push(x);
+    const curRound = S.phase === 'ready' ? 1 : anchor.round;
+    const openKey = `${anchor.g}:${curRound}`;
+    const opening = S.railOpen !== openKey;
+    S.railOpen = openKey;
+    html = byRound.map((xs, k) => {
+      const r = k + 1;
+      const head = `<span class="rl-word">${word}</span><span>${r}</span>`;
+      if (r === curRound) {
+        return `<div class="rl-round${opening ? ' opening' : ''}" role="listitem" aria-label="${word} ${r} of ${byRound.length}"><div class="rl-round-head">${head}</div>
+          ${xs.map((x) => pill(x, String.fromCharCode(65 + x.st.ii), x.st.name)).join('')}</div>`;
+      }
+      const done = S.phase !== 'ready' && xs.every((x) => x.i < S.i);
+      return `<div class="rl-set rl-fold ${done ? 'done' : 'todo'}" role="listitem" aria-label="${word} ${r}${done ? ', done' : ''}">${done ? icon('check') : head}</div>`;
+    }).join('');
+  }
+  const unit = (rounds || first.round != null ? word : 'set').toLowerCase();
+  const total = first.sets;
+  const canRemove = total > Math.max(1, S.phase === 'ready' ? 1 : anchor.set);
+  return `<div class="pl-rail">
+    <button class="rl-btn glass glass-interactive" data-action="pl-sets" data-delta="-1" aria-label="Remove a ${unit}" ${canRemove ? '' : 'disabled'}>${icon('minus')}</button>
+    <div class="rl-list" role="list" aria-label="${rounds ? `${word}s` : 'Sets'}">${html}</div>
+    <button class="rl-btn glass glass-interactive" data-action="pl-sets" data-delta="1" aria-label="Add a ${unit}" ${total >= 20 ? 'disabled' : ''}>${icon('plus')}</button>
+  </div>`;
+}
+
+/** − / + on the rail: change this exercise's sets (or this circuit's rounds) in the day's plan, then rebuild the steps. */
+function changeSets(delta) {
+  const cur = S.phase === 'ready' ? S.steps[0] : S.steps[S.i];
+  const b = getDay(S.key)?.blocks[cur?.bi];
+  if (!cur?.g || !b) return;
+  const circuit = b.format === 'circuit';
+  const total = circuit ? b.rounds : b.items[cur.ii].sets;
+  const next = total + delta;
+  if (next < Math.max(1, S.phase === 'ready' ? 1 : cur.set) || next > 20) return;
+  const keyOf = (st) => `${st.kind}:${st.bi}:${st.ii}:${st.set}`;
+  const key = keyOf(cur);
+  const doneWork = S.steps.slice(0, S.i).filter((x) => x.kind === 'work').length;
+  update((s) => {
+    const d = s.plan.days[S.key];
+    if (circuit) d.blocks[cur.bi].rounds = next; else d.blocks[cur.bi].items[cur.ii].sets = next;
+    d.estSec = estimateSeconds(d, EX);
+  });
+  S.steps = flatten(getDay(S.key), EX);
+  if (S.phase !== 'ready') {
+    const i = S.steps.findIndex((st) => keyOf(st) === key);
+    if (i >= 0) S.i = i;
+    else {
+      // The rest on screen disappeared (its set was the last): move to the next unfinished set
+      const j = S.steps.reduce((acc, st, k) => (acc < 0 && st.kind === 'work' && S.steps.slice(0, k).filter((x) => x.kind === 'work').length === doneWork ? k : acc), -1);
+      if (j < 0) { finish(); return; }
+      S.i = j;
+      if (S.mode === 'timed') startPhase(now(), true); else pacedEnter(now(), true);
+    }
+  }
+  if (settings().haptics) cue.haptic(10);
+  persist();
+  render();
+  renderAccessory();
 }
 
 function effortLine(st, isReady) {
@@ -661,12 +781,14 @@ function pacedView(st) {
       ${st.ramp ? '<div class="pl-sub">Light ramp-up set: about half effort</div>' : st.sets > 1 ? `<div class="pl-sub">${esc(setLabel(st))}</div>` : ''}
       ${effortLine(st, false)}
       ${st.atTop && st.set === st.sets ? '<div class="pl-hint">Top of your rep range. Next time, go heavier or pick a harder variation.</div>' : ''}
+      <div class="pl-stage">${railHtml()}
       <div class="pl-target">
         ${timerOn
           ? `<div class="pl-big rounded num" data-pl-big>0</div><div class="pl-small" data-pl-small>seconds left</div>`
           : `<div class="pl-big rounded num">${st.mode === 'time' ? st.duration : st.reps}</div>
              <div class="pl-small">${st.mode === 'time' ? 'seconds' : 'reps'}${st.perSide ? ' each side' : ''}${st.alternating ? ' · alternating' : ''}</div>`}
         ${st.mode === 'time' && !timerOn ? `<button class="btn btn-tinted sm" data-action="pl-timer">${icon('timer', 'xs')} Start Timer</button>` : ''}
+      </div>
       </div>
       <button class="toolbar-pill glass glass-interactive pl-howto" data-action="pl-howto" data-ex="${st.exId}">${icon('circle-play', 'sm')} How to</button>
       ${upNext()}
@@ -701,7 +823,7 @@ function live() {
   if (!S) return;
   const t = now();
   const elapsedEl = document.querySelector('[data-pl-elapsed]');
-  if (elapsedEl) elapsedEl.textContent = fmtDuration(S.activeMs / 1000);
+  if (elapsedEl) elapsedEl.textContent = fmtDuration(elapsedMs() / 1000);
   const accT = document.querySelector('[data-acc-time]');
   if (accT) accT.textContent = accessoryTime();
   if (!el || S.phase === 'select' || S.phase === 'done') return;
@@ -742,7 +864,7 @@ function live() {
 
 function accessoryTime() {
   if (!S || S.phase === 'select' || S.phase === 'done') return '';
-  if (S.mode !== 'timed' && !resting()) return fmtDuration(S.activeMs / 1000);
+  if (S.mode !== 'timed' && !resting()) return fmtDuration(elapsedMs() / 1000);
   const rem = S.paused ? S.remainingMs : Math.max(0, S.phaseEndsAt - now());
   return fmtDuration(rem / 1000);
 }
@@ -784,6 +906,7 @@ export const actions = {
   'pl-add': (b) => addRest(+b.dataset.sec),
   'pl-timer': () => startPacedTimer(),
   'pl-mute': () => toggleMute(),
+  'pl-sets': (b) => changeSets(+b.dataset.delta),
   'pl-done': () => { hide(true); S = null; renderAccessory(); },
   'pl-howto': (b) => {
     // Pause only if something is counting down; an untimed own-pace set keeps the workout clock running
