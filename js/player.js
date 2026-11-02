@@ -71,6 +71,7 @@ function begin(mode) {
     S.phaseStart = now();
     S.phaseEndsAt = null;
     announceWork(S.steps[0], true);
+    glowStart(S.steps[0]);
   }
   persist();
   render();
@@ -179,6 +180,7 @@ function startPhase(at, withCues) {
   } else if (st.kind === 'work') {
     if (soundOn()) cue.goBeep();
     announceWork(st);
+    glowStart(st);
   } else if (voiceOn()) {
     const next = S.steps[st.next];
     const prevWork = S.steps.slice(0, S.i).reverse().find((x) => x.kind === 'work');
@@ -229,6 +231,7 @@ function pacedEnter(at, withCues) {
   if (soundOn()) cue.goBeep();
   if (settings().haptics) cue.haptic(15);
   announceWork(st);
+  glowStart(st);
 }
 
 function pacedAdvance(at, withCues = true) {
@@ -261,6 +264,7 @@ function pacedTick(t) {
     }
     if (st.kind === 'work' && st.perSide && !S.pacedHalf && endsAt - t <= S.pacedTotal / 2) {
       S.pacedHalf = true;
+      sideGlow('right');
       if (voiceOn()) cue.say('Switch sides');
       if (settings().haptics) cue.haptic(15);
     }
@@ -298,10 +302,14 @@ function tick() {
       if (rep.total > S.lastRep) {
         S.lastRep = rep.total;
         if (soundOn() && settings().repTick && rep.total > 1) cue.tick();
-        if (st.perSide && !st.alternating && rep.total === st.reps + 1 && voiceOn()) cue.say('Switch sides');
+        if (st.perSide && !st.alternating && rep.total === st.reps + 1) {
+          sideGlow('right');
+          if (voiceOn()) cue.say('Switch sides');
+        }
       }
     } else if (st.perSide && !S.halfCued && t - S.phaseStart >= st.workSec * 500) {
       S.halfCued = true;
+      sideGlow('right');
       if (voiceOn()) cue.say('Switch sides');
       if (settings().haptics) cue.haptic(15);
     }
@@ -414,6 +422,7 @@ function startPacedTimer() {
   S.pacedRemaining = null;
   S.pacedHalf = false;
   S.lastSecond = null;
+  glowStart(st);
   if (soundOn()) cue.goBeep();
   if (!loopId) startLoop();
   persist();
@@ -495,47 +504,72 @@ function render() {
   if (S.phase === 'select') el.innerHTML = selectView();
   else if (S.phase === 'done') el.innerHTML = doneView();
   else el.innerHTML = runView(phaseClass);
+  if (S.glow) { sideGlow(S.glow); S.glow = null; }
   fit();
   live();
 }
 
-/** Size the timer ring (or the own-pace number) to the space left, so Up Next and the controls never get pushed off screen. */
+/* ---------- Side glow ---------- */
+
+/** A set done one side at a time starts on the left: glow that edge once the screen shows the set. */
+function glowStart(st) {
+  if (el && st?.perSide && !st.alternating) S.glow = 'left';
+}
+
+/** Pulse a soft glow from one edge of the screen for a few seconds, to show which side to work. */
+function sideGlow(side) {
+  if (!el) return;
+  el.querySelectorAll('.pl-glow').forEach((g) => g.remove());
+  const g = document.createElement('div');
+  g.className = `pl-glow ${side}`;
+  g.setAttribute('aria-hidden', 'true');
+  g.addEventListener('animationend', () => g.remove());
+  el.appendChild(g);
+}
+
+/**
+ * Lay out the workout screen so nothing moves between steps. The set rail and the ring (or the
+ * own-pace number) share one fixed band: from a point under the header that clears a two-line
+ * exercise name down to the Up Next card. The ring is a fixed size and centred in that band,
+ * whatever sits above it, and the rail fills the band on the left edge.
+ */
 function fit() {
   const main = el?.querySelector('.pl-main');
   const stage = main?.querySelector('.pl-stage');
   const flex = stage?.querySelector('.pl-ring-wrap, .pl-target');
-  if (!main || !flex) return;
-  const gap = parseFloat(getComputedStyle(main).rowGap) || 0;
-  const pad = parseFloat(getComputedStyle(main).paddingTop) + parseFloat(getComputedStyle(main).paddingBottom);
-  const kids = [...main.children];
-  const others = kids.filter((k) => k !== stage).reduce((h, k) => h + k.offsetHeight, 0);
-  const avail = main.clientHeight - pad - others - gap * (kids.length - 1) - 16;
+  const head = el?.querySelector('.pl-top');
+  const nextCard = main?.querySelector('.pl-next');
+  if (!main || !flex || !head || !nextCard) return;
+  stage.style.marginTop = '0px';
+  const run = main.parentElement.getBoundingClientRect();
+  const headBottom = head.getBoundingClientRect().bottom - run.top;
+  const bandTop = headBottom + RAIL_TOP;
+  // Where the Up Next card sits at the bottom of the screen (measured from the bottom, so a tall step can't push it)
+  const cardTop = main.getBoundingClientRect().bottom - run.top - parseFloat(getComputedStyle(main).paddingBottom) - nextCard.offsetHeight;
+  const bandBottom = cardTop - 14;
+  const center = (bandTop + bandBottom) / 2;
   const width = main.clientWidth - 40;
-  // The set rail sits to the left of the ring; leave room for it on both sides so the ring stays centred
+  const roomForRail = main.clientWidth - 2 * (RAIL_WIDTH + 12);   // kept on every step so the size never changes
+  const below = cardTop - center - ACTIONS_ROW;                    // the How to / +15 s row sits under the ring
+  const above = center - (headBottom + HEAD_ROOM);                // phase label, two-line name, subtitle, effort
+  const size = Math.floor(Math.max(120, Math.min(width * 0.8, roomForRail, 320, below * 2, above * 2)));
+  main.style.setProperty('--ring', `${size}px`);
+  if (!flex.classList.contains('pl-ring-wrap')) {
+    stage.style.minHeight = `${size}px`;
+    main.style.setProperty('--target-font', `${Math.floor(Math.max(56, Math.min(size * 0.6, width * 0.36, 150)))}px`);
+  }
+  // Push the stage down so its middle sits on the band's middle
+  const st = stage.getBoundingClientRect();
+  stage.style.marginTop = `${Math.max(0, Math.round(center - st.height / 2 - (st.top - run.top)))}px`;
   const rail = el.querySelector('.pl-rail');
-  // Room for the rail is kept even on steps without one, so the ring does not jump in size between exercises
-  const roomForRail = main.clientWidth - 2 * (RAIL_WIDTH + 12);
-  if (flex.classList.contains('pl-ring-wrap')) {
-    main.style.setProperty('--ring', `${Math.floor(Math.max(120, Math.min(avail, width * 0.8, roomForRail, 320)))}px`);
-  } else {
-    const extra = flex.offsetHeight - (flex.querySelector('.pl-big')?.offsetHeight || 0);
-    main.style.setProperty('--target-font', `${Math.floor(Math.max(56, Math.min((avail - extra) * 0.92, width * 0.36, 150)))}px`);
-  }
-  // The rail is pinned to the left edge between a fixed point under the header (clear of a
-  // two-line exercise name) and the Up Next card, so it stays put from one step to the next
   if (rail) {
-    const run = rail.parentElement.getBoundingClientRect();
-    const head = el.querySelector('.pl-top')?.getBoundingClientRect();
-    const next = el.querySelector('.pl-next')?.getBoundingClientRect();
-    const top = (head ? head.bottom - run.top : 60) + RAIL_TOP;
-    const bottom = (next ? next.top - run.top : run.height - 160) - 14;
-    rail.style.top = `${Math.round(top)}px`;
-    rail.style.height = `${Math.round(Math.max(170, bottom - top))}px`;
+    rail.style.top = `${Math.round(bandTop)}px`;
+    rail.style.height = `${Math.round(Math.max(170, bandBottom - bandTop))}px`;
+    // Keep the current pill in view
+    const list = rail.querySelector('.rl-list');
+    const cur = list?.querySelector('.cur, .next');
+    if (list && cur) list.scrollTop = Math.max(0, cur.offsetTop - list.clientHeight / 2 + cur.offsetHeight / 2);
   }
-  // Keep the current pill in view
-  const list = rail?.querySelector('.rl-list');
-  const cur = list?.querySelector('.cur, .next');
-  if (list && cur) list.scrollTop = Math.max(0, cur.offsetTop - list.clientHeight / 2 + cur.offsetHeight / 2);
 }
 
 window.addEventListener('resize', () => { if (el && S && S.phase !== 'select' && S.phase !== 'done') fit(); });
@@ -680,6 +714,8 @@ function upNext() {
 const restText = (sec) => (sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : `${sec}s`);
 const RAIL_WIDTH = 62;   // matches .pl-rail in app.css
 const RAIL_TOP = 176;    // below the header: phase label, two-line name and subtitle fit above the rail
+const HEAD_ROOM = 200;   // the same, plus the effort line, must fit above the ring
+const ACTIONS_ROW = 70;  // under the ring before the Up Next card: gap, How to / +15 s row, gap, ring margin
 
 /** done / cur (on screen) / next (the set coming after a rest, or the first one) / todo */
 function railState(i) {
@@ -815,11 +851,13 @@ function pacedView(st) {
         ${timerOn
           ? `<div class="pl-big rounded num" data-pl-big>0</div><div class="pl-small" data-pl-small>seconds left</div>`
           : `<div class="pl-big rounded num">${st.mode === 'time' ? st.duration : st.reps}</div>
-             <div class="pl-small">${st.mode === 'time' ? 'seconds' : 'reps'}${st.perSide ? ' each side' : ''}${st.alternating ? ' · alternating' : ''}</div>`}
-        ${st.mode === 'time' && !timerOn ? `<button class="btn btn-tinted sm" data-action="pl-timer">${icon('timer', 'xs')} Start Timer</button>` : ''}
+             <div class="pl-small">${st.mode === 'time' ? 'seconds' : 'reps'}${st.perSide ? (st.alternating ? ' each side · alternating' : ' each side · left first') : ''}</div>`}
       </div>
       </div>
-      <button class="toolbar-pill glass glass-interactive pl-howto" data-action="pl-howto" data-ex="${st.exId}">${icon('circle-play', 'sm')} How to</button>
+      <div class="pl-rest-actions">
+        ${st.mode === 'time' && !timerOn ? `<button class="toolbar-pill glass glass-prominent glass-interactive" data-action="pl-timer">${icon('timer', 'sm')} Start Timer</button>` : ''}
+        <button class="toolbar-pill glass glass-interactive pl-howto" data-action="pl-howto" data-ex="${st.exId}">${icon('circle-play', 'sm')} How to</button>
+      </div>
       ${upNext()}
     </main>
     ${pacedControls(st)}

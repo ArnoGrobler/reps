@@ -1023,7 +1023,14 @@ button.widget:active { transform: scale(0.97); }
 .pl-outline-block { background: var(--bg-elev); border-radius: 22px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
 .pl-outline-item { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
 
-.pl-run { overflow: hidden; position: relative; }
+.pl-run { overflow: hidden; position: relative; z-index: 1; }
+/* Which side to work: a soft glow from that edge of the screen, pulsing for a few seconds */
+.pl-glow { position: absolute; top: 0; bottom: 0; width: 60%; z-index: 0; pointer-events: none; opacity: 0; animation: pl-glow 3.4s ease-in-out forwards; }
+.pl-glow.left { left: 0; background: linear-gradient(to right, color-mix(in srgb, var(--phase) 42%, transparent), transparent); }
+.pl-glow.right { right: 0; background: linear-gradient(to left, color-mix(in srgb, var(--phase) 42%, transparent), transparent); }
+@keyframes pl-glow { 0% { opacity: 0; } 14% { opacity: 1; } 32% { opacity: 0.3; } 50% { opacity: 1; } 68% { opacity: 0.3; } 84% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes pl-glow-calm { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pl-glow { animation-name: pl-glow-calm; } }
 .pl-main {
   flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
   padding: 8px max(20px, env(safe-area-inset-right, 0px)) 16px max(20px, env(safe-area-inset-left, 0px));
