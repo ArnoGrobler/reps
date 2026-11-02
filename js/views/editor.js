@@ -5,7 +5,7 @@
 
 import { icon } from '../icons.js';
 import { esc, pushSheet, popSheet, segmented, stepperHtml, switchHtml, alertDialog, toast } from '../ui.js';
-import { EX, allowedExercises, EQUIP_ICON, EQUIP_COLOR, mainEquip, PATTERNS, titleCase } from '../data.js';
+import { EX, allowedExercises, EQUIP_ICON, EQUIP_COLOR, mainEquip, PATTERNS, titleCase, perSideAmount } from '../data.js';
 import { fmtShort, dow, LOCALE } from '../dates.js';
 import { getState, update, getDay } from '../store.js';
 import { estimateSeconds, workSeconds, makeItem, alternatives, canDo, titleFor, regenerateDay } from '../generator.js';
@@ -112,8 +112,8 @@ function itemEditorView() {
           ${circuit ? `<div class="row"><div class="grow"><div class="title">${block.pair ? 'Sets' : 'Rounds'}</div><div class="subtitle">${block.pair ? 'Set for the pair' : 'Set for the whole circuit'}</div></div><span class="detail">${block.rounds}</span></div>`
             : `<div class="row"><div class="grow title">Sets</div><div class="value-stepper"><span class="val rounded">${item.sets}</span>${stepperHtml('ed:sets', { canDec: item.sets > 1, canInc: item.sets < 10, label: 'sets' })}</div></div>`}
           ${item.mode === 'reps'
-            ? `<div class="row"><div class="grow"><div class="title">Reps</div>${ex?.perSide ? '<div class="subtitle">Each side</div>' : ''}</div><div class="value-stepper"><span class="val rounded">${item.reps}</span>${stepperHtml('ed:reps', { canDec: item.reps > 1, canInc: item.reps < 100, label: 'reps' })}</div></div>`
-            : `<div class="row"><div class="grow"><div class="title">Work time</div>${ex?.perSide ? '<div class="subtitle">Each side</div>' : ''}</div><div class="value-stepper"><span class="val rounded">${item.duration} s</span>${stepperHtml('ed:duration', { canDec: item.duration > 5, canInc: item.duration < 600, label: 'seconds' })}</div></div>`}
+            ? `<div class="row"><div class="grow"><div class="title">Reps</div>${perSideAmount(item, ex) ? `<div class="subtitle">Each side${ex.alternating ? ', alternating' : ''}</div>` : ''}</div><div class="value-stepper"><span class="val rounded">${item.reps}</span>${stepperHtml('ed:reps', { canDec: item.reps > 1, canInc: item.reps < 100, label: 'reps' })}</div></div>`
+            : `<div class="row"><div class="grow"><div class="title">Work time</div>${perSideAmount(item, ex) ? '<div class="subtitle">Each side</div>' : ex?.alternating ? '<div class="subtitle">Alternating sides</div>' : ''}</div><div class="value-stepper"><span class="val rounded">${item.duration} s</span>${stepperHtml('ed:duration', { canDec: item.duration > 5, canInc: item.duration < 600, label: 'seconds' })}</div></div>`}
           <div class="row"><div class="grow"><div class="title">Rest after</div><div class="subtitle">${circuit ? 'Before the next exercise' : 'Between sets'}</div></div><div class="value-stepper"><span class="val rounded">${item.rest} s</span>${stepperHtml('ed:rest', { canDec: item.rest > 0, canInc: item.rest < 300, label: 'rest seconds' })}</div></div>
         </div>
         <p class="footnote">About ${Math.max(1, Math.round(total / 60))} min for this exercise. In timed mode each ${item.mode === 'reps' ? `rep gets about ${ex?.tempo || 2.5} s` : 'set counts down'}.</p>

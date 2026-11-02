@@ -2,7 +2,7 @@
 
 import { icon } from '../icons.js';
 import { esc, openSheet, pushSheet, closeSheet, showMenu, alertDialog, toast } from '../ui.js';
-import { EX, allowedExercises, EQUIP_ICON, EQUIP_COLOR, mainEquip, rxText } from '../data.js';
+import { EX, allowedExercises, EQUIP_ICON, EQUIP_COLOR, mainEquip, rxText, sideText } from '../data.js';
 import { todayKey, fmtWeekday, fmtMonthDay, relativeLabel, fmtMinutes, dow } from '../dates.js';
 import { getState, update, getDay, isDone, dayStatus, weekIndexOf } from '../store.js';
 import { countExercises, estimateSeconds, regenerateDay, FOCUS } from '../generator.js';
@@ -23,10 +23,10 @@ export function itemRx(it, b) {
   const ex = EX[it.exId];
   if (it.ramp) return `${it.reps} reps · light ramp-up set`;
   const range = it.range && it.mode === 'reps' ? ` (range ${it.range[0]}–${it.range[1]})` : '';
-  if (b.pair) return `${it.mode === 'time' ? `${it.duration} s` : `${it.reps} reps`}${ex?.perSide ? ' / side' : ''}${range} · ${it.rest} s between`;
+  if (b.pair) return `${it.mode === 'time' ? `${it.duration} s` : `${it.reps} reps`}${sideText(it, ex)}${range} · ${it.rest} s between`;
   if (b.format === 'circuit') {
     const amt = it.mode === 'time' ? `${it.duration} s` : `${it.reps} reps`;
-    return `${amt}${ex?.perSide && !it.oneSide ? ' / side' : ''}${it.rest ? ` · ${it.rest} s ${b.restLabel ? b.restLabel.toLowerCase() : it.rest <= 20 ? 'to switch' : 'rest'}` : ''}`;
+    return `${amt}${sideText(it, ex)}${it.rest ? ` · ${it.rest} s ${b.restLabel ? b.restLabel.toLowerCase() : it.rest <= 20 ? 'to switch' : 'rest'}` : ''}`;
   }
   return `${rxText(it, ex)}${range} · ${it.rest} s rest`;
 }

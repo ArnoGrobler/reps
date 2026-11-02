@@ -1,11 +1,12 @@
 // Exercise library access and display helpers.
 
 /** Shown in the account sheet so it's easy to tell which version a device runs. */
-export const VERSION = '2026.10.31.8';
+export const VERSION = '2026.11.02.1';
 
 import { EXERCISES, EQUIPMENT } from './data/exercises.js';
+import { perSideAmount } from './generator.js';
 
-export { EXERCISES, EQUIPMENT };
+export { EXERCISES, EQUIPMENT, perSideAmount };
 
 export const EX = Object.fromEntries(EXERCISES.map((e) => [e.id, e]));
 export const EQ = Object.fromEntries(EQUIPMENT.map((q) => [q.id, q]));
@@ -45,9 +46,12 @@ export function mainEquip(ex) {
   return ex?.equipment.find((q) => q !== 'bodyweight') || 'bodyweight';
 }
 
+/** " / side" when the amount is per side, else "". */
+export const sideText = (item, ex) => (perSideAmount(item, ex) ? ' / side' : '');
+
 /** "3 × 12", "3 × 10 / side", "40 s", "2 × 30 s / side" */
 export function rxText(item, ex, { sets = true } = {}) {
-  const side = ex?.perSide ? ' / side' : '';
+  const side = sideText(item, ex);
   const amount = item.mode === 'time' ? `${item.duration} s` : `${item.reps}`;
   const s = sets && item.sets > 1 ? `${item.sets} × ` : '';
   return `${s}${amount}${item.mode === 'reps' && !s ? ' reps' : ''}${side}`;

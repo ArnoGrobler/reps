@@ -1,11 +1,12 @@
 // Workout mode.
 // Timed: get-ready countdown → work (rep counter or countdown) → rest → … hands-free.
-// Own pace: one set at a time, tap Next. Finishing marks the day complete.
+// Own pace: sets wait for you (tap Done); rests between them count down and move on by themselves.
+// Finishing marks the day complete.
 // The session survives minimising (bottom accessory) and page reloads (resumes paused).
 
 import { icon } from './icons.js';
 import { esc, alertDialog, openSheet, closeSheet, toast } from './ui.js';
-import { EX, EQUIP_ICON, mainEquip } from './data.js';
+import { EX, EQUIP_ICON, mainEquip, perSideAmount } from './data.js';
 import { fmtDuration, fmtMinutes, relativeLabel, todayKey } from './dates.js';
 import { getState, update, getDay, loadSession, saveSession } from './store.js';
 import { flatten, countExercises, estimateSeconds } from './generator.js';
@@ -18,7 +19,14 @@ let loopId = 0;
 let intervalId = 0;
 
 const settings = () => getState().settings;
+const soundOn = () => settings().sound && !settings().muted;
+const voiceOn = () => settings().voice && !settings().muted;
 const now = () => Date.now();
+const resting = () => S.steps[S.i]?.kind === 'rest';
+/** Rests always count down; in timed mode every phase does. */
+const onPhaseClock = () => S.mode === 'timed' || resting();
+const countdownRunning = () => onPhaseClock() || !!S.pacedEndsAt;
+const workLeftAfter = (i) => S.steps.slice(i + 1).some((x) => x.kind === 'work');
 
 /* ---------- Session lifecycle ---------- */
 
@@ -46,7 +54,7 @@ function begin(mode) {
   const all = flatten(day, EX);
   S.mode = mode;
   S.effortShort = day.effortShort || '';
-  S.steps = mode === 'timed' ? all : all.filter((s) => s.kind === 'work');
+  S.steps = all;   // own pace keeps the rests; only the sets are untimed
   S.i = 0;
   S.startedAt = now();
   S.lastTick = now();
@@ -59,6 +67,8 @@ function begin(mode) {
     startPhase(now(), true);
   } else {
     S.phase = 'run';
+    S.phaseStart = now();
+    S.phaseEndsAt = null;
     announceWork(S.steps[0], true);
   }
   persist();
@@ -78,8 +88,8 @@ function finish(early = false) {
   });
   stopLoop();
   cue.keepAwake(false);
-  if (settings().sound) cue.doneChime();
-  if (settings().voice) cue.say('Workout complete. Great work.');
+  if (soundOn()) cue.doneChime();
+  if (voiceOn()) cue.say('Workout complete. Great work.');
   if (settings().haptics) cue.haptic([20, 60, 20]);
   saveSession(null);
   if (!el) show(); else render();
@@ -98,10 +108,7 @@ function clearSession() {
 /** Before switching profile: pause and save the session under its own profile, then clear it from screen. */
 export function suspendForSwitch() {
   if (S && S.phase !== 'select' && S.phase !== 'done') {
-    if (!S.paused) {
-      S.paused = true;
-      if (S.mode === 'timed') S.remainingMs = Math.max(0, S.phaseEndsAt - now());
-    }
+    if (!S.paused) freeze();
     persist();
   }
   stopLoop();
@@ -129,7 +136,25 @@ export function restoreSession() {
 function persist() {
   if (!S || S.phase === 'select' || S.phase === 'done') return;
   const remainingMs = S.paused ? S.remainingMs : Math.max(0, (S.phaseEndsAt || now()) - now());
-  saveSession({ ...S, remainingMs });
+  const pacedRemaining = S.pacedEndsAt ? Math.max(0, S.pacedEndsAt - now()) : S.pacedRemaining;
+  saveSession({ ...S, remainingMs, pacedRemaining, pacedEndsAt: null });
+}
+
+/** Stop the clocks (workout time, the rest or phase countdown, an own-pace hold timer). */
+function freeze() {
+  S.paused = true;
+  if (onPhaseClock()) S.remainingMs = Math.max(0, S.phaseEndsAt - now());
+  if (S.pacedEndsAt) { S.pacedRemaining = Math.max(0, S.pacedEndsAt - now()); S.pacedEndsAt = null; }
+}
+
+function thaw() {
+  S.paused = false;
+  S.lastTick = now();
+  if (onPhaseClock()) {
+    S.phaseEndsAt = now() + (S.remainingMs || 0);
+    S.phaseStart = S.phaseEndsAt - phaseLength(S.steps[S.i] || {}) * 1000;
+  }
+  if (S.pacedRemaining != null) { S.pacedEndsAt = now() + S.pacedRemaining; S.pacedRemaining = null; }
 }
 
 /* ---------- Timed engine ---------- */
@@ -147,14 +172,13 @@ function startPhase(at, withCues) {
   S.lastRep = 0;
   S.halfCued = false;
   if (!withCues) return;
-  const set = settings();
-  if (set.haptics) cue.haptic(15);
+  if (settings().haptics) cue.haptic(15);
   if (S.phase === 'ready') {
-    if (set.voice) cue.say(`Get ready. First up: ${spokenRx(S.steps[0])}`);
+    if (voiceOn()) cue.say(`Get ready. First up: ${spokenRx(S.steps[0])}`);
   } else if (st.kind === 'work') {
-    if (set.sound) cue.goBeep();
+    if (soundOn()) cue.goBeep();
     announceWork(st);
-  } else if (set.voice) {
+  } else if (voiceOn()) {
     const next = S.steps[st.next];
     const prevWork = S.steps.slice(0, S.i).reverse().find((x) => x.kind === 'work');
     const same = next && prevWork && next.exId === prevWork.exId;
@@ -165,14 +189,14 @@ function startPhase(at, withCues) {
 }
 
 function announceWork(st, first = false) {
-  if (!settings().voice || !st) return;
+  if (!voiceOn() || !st) return;
   const prev = S.steps.slice(0, S.i).reverse().find((x) => x.kind === 'work');
   if (!first && prev && prev.exId === st.exId) cue.say(`${st.circuit ? 'Round' : 'Set'} ${st.set}. ${amountText(st)}.`);
   else cue.say(spokenRx(st));
 }
 
 function amountText(st) {
-  const side = st.perSide ? ' each side' : '';
+  const side = `${st.perSide ? ' each side' : ''}${st.alternating ? ', alternating' : ''}`;
   return st.mode === 'time' ? `${st.duration} seconds${side}` : `${st.reps} reps${side}`;
 }
 const spokenRx = (st) => `${st.name}. ${amountText(st)}.`;
@@ -189,13 +213,67 @@ function advance(at, withCues = true) {
   return true;
 }
 
+/* ---------- Own-pace engine ---------- */
+
+/** Enter step S.i: a rest starts counting down; a set waits for Done (or its hold timer). */
+function pacedEnter(at, withCues) {
+  const st = S.steps[S.i];
+  S.pacedEndsAt = null;
+  S.pacedRemaining = null;
+  if (st.kind === 'rest') { startPhase(at, withCues); return; }
+  S.phaseStart = at;
+  S.phaseEndsAt = null;
+  S.lastSecond = null;
+  if (!withCues) return;
+  if (soundOn()) cue.goBeep();
+  if (settings().haptics) cue.haptic(15);
+  announceWork(st);
+}
+
+function pacedAdvance(at, withCues = true) {
+  if (!workLeftAfter(S.i)) { finish(); return false; }
+  S.i++;
+  pacedEnter(at, withCues);
+  return true;
+}
+
+function pacedTick(t) {
+  // Rests and hold timers end by themselves (catching up if the page was in the background)
+  let changed = false;
+  for (;;) {
+    const st = S.steps[S.i];
+    const endsAt = st.kind === 'rest' ? S.phaseEndsAt : S.pacedEndsAt;
+    if (!endsAt || t < endsAt) break;
+    const behind = t - endsAt > 1500;
+    if (st.kind === 'work' && !behind && settings().haptics) cue.haptic([15, 40, 15]);
+    if (!pacedAdvance(endsAt, !behind)) return;
+    changed = true;
+  }
+  if (changed) { persist(); render(); renderAccessory(); return; }
+  const st = S.steps[S.i];
+  const endsAt = st.kind === 'rest' ? S.phaseEndsAt : S.pacedEndsAt;
+  if (endsAt) {
+    const sec = Math.ceil((endsAt - t) / 1000);
+    if (sec !== S.lastSecond) {
+      S.lastSecond = sec;
+      if (sec <= 3 && sec >= 1 && soundOn()) cue.countBeep();
+    }
+    if (st.kind === 'work' && st.perSide && !S.pacedHalf && endsAt - t <= S.pacedTotal / 2) {
+      S.pacedHalf = true;
+      if (voiceOn()) cue.say('Switch sides');
+      if (settings().haptics) cue.haptic(15);
+    }
+  }
+  live();
+}
+
 function tick() {
   if (!S || S.phase === 'select' || S.phase === 'done') return;
   const t = now();
   if (!S.paused) S.activeMs += t - (S.lastTick || t);
   S.lastTick = t;
-  if (S.mode !== 'timed') { if (S.pacedEndsAt && !S.paused && t >= S.pacedEndsAt) pacedTimerDone(); live(); return; }
   if (S.paused) { live(); return; }
+  if (S.mode !== 'timed') { pacedTick(t); return; }
 
   // Catch up if the page was in the background
   let changed = false;
@@ -207,26 +285,25 @@ function tick() {
   if (!S) return;
   if (changed) { persist(); render(); renderAccessory(); return; }
 
-  const set = settings();
   const st = S.steps[S.i];
   const remaining = (S.phaseEndsAt - t) / 1000;
   const sec = Math.ceil(remaining);
   if (sec !== S.lastSecond) {
     S.lastSecond = sec;
-    if (sec <= 3 && sec >= 1 && set.sound) cue.countBeep();
+    if (sec <= 3 && sec >= 1 && soundOn()) cue.countBeep();
   }
   if (S.phase === 'run' && st.kind === 'work') {
     if (st.mode === 'reps') {
       const rep = currentRep(st, t);
       if (rep.total > S.lastRep) {
         S.lastRep = rep.total;
-        if (set.sound && set.repTick && rep.total > 1) cue.tick();
-        if (st.perSide && rep.total === st.reps + 1 && set.voice) cue.say('Switch sides');
+        if (soundOn() && settings().repTick && rep.total > 1) cue.tick();
+        if (st.perSide && !st.alternating && rep.total === st.reps + 1 && voiceOn()) cue.say('Switch sides');
       }
     } else if (st.perSide && !S.halfCued && t - S.phaseStart >= st.workSec * 500) {
       S.halfCued = true;
-      if (set.voice) cue.say('Switch sides');
-      if (set.haptics) cue.haptic(15);
+      if (voiceOn()) cue.say('Switch sides');
+      if (settings().haptics) cue.haptic(15);
     }
   }
   live();
@@ -238,6 +315,8 @@ function currentRep(st, t = now()) {
   const elapsed = S.paused ? (S.phaseEndsAt - S.phaseStart) - S.remainingMs : t - S.phaseStart;
   const per = (st.workSec * 1000) / total;
   const n = Math.min(total, Math.floor(elapsed / per) + 1);
+  // Alternating moves count left + right as one rep
+  if (st.alternating) return { total: n, inSide: Math.ceil(n / sides), side: 'Alternate sides' };
   return { total: n, inSide: ((n - 1) % st.reps) + 1, side: st.perSide ? (n > st.reps ? 'Right side' : 'Left side') : '' };
 }
 
@@ -259,19 +338,11 @@ function togglePause() {
   if (!S || S.phase === 'select' || S.phase === 'done') return;
   cue.unlock();
   if (S.paused) {
-    S.paused = false;
-    S.lastTick = now();
-    if (S.mode === 'timed') {
-      S.phaseEndsAt = now() + S.remainingMs;
-      S.phaseStart = S.phaseEndsAt - phaseLength(S.steps[S.i] || {}) * 1000;
-    }
-    if (S.pacedRemaining != null) { S.pacedEndsAt = now() + S.pacedRemaining; S.pacedRemaining = null; }
+    thaw();
     if (settings().wakeLock) cue.keepAwake(true);
     if (!loopId) startLoop();
   } else {
-    S.paused = true;
-    if (S.mode === 'timed') S.remainingMs = Math.max(0, S.phaseEndsAt - now());
-    if (S.pacedEndsAt) { S.pacedRemaining = Math.max(0, S.pacedEndsAt - now()); S.pacedEndsAt = null; }
+    freeze();
     cue.stopSpeech();
   }
   persist();
@@ -282,17 +353,16 @@ function togglePause() {
 function next() {
   if (!S) return;
   cue.unlock();
+  const wasPaused = S.paused;
   if (S.mode === 'timed') {
-    const wasPaused = S.paused;
     if (!advance(now())) return;
-    if (wasPaused) { S.paused = false; S.lastTick = now(); }
   } else {
-    S.pacedEndsAt = null; S.pacedRemaining = null;
-    if (S.i >= S.steps.length - 1) { finish(); return; }
-    S.i++;
-    announceWork(S.steps[S.i]);
+    if (!pacedAdvance(now())) return;
     if (settings().haptics) cue.haptic(12);
   }
+  // Moving on resumes a paused workout
+  if (wasPaused) { S.paused = false; S.lastTick = now(); }
+  if (!loopId) startLoop();
   persist();
   render();
   renderAccessory();
@@ -314,17 +384,21 @@ function prev() {
     S.i = j;
     S.phase = 'run';
     startPhase(now(), true);
-    if (S.paused) { S.paused = false; S.lastTick = now(); }
   } else {
-    S.pacedEndsAt = null; S.pacedRemaining = null;
-    S.i = Math.max(0, S.i - 1);
+    // Back to the previous set (from a rest, that is the set just finished)
+    let j = S.i - 1;
+    while (j > 0 && S.steps[j].kind !== 'work') j--;
+    S.i = Math.max(0, j);
+    pacedEnter(now(), false);
   }
+  if (S.paused) { S.paused = false; S.lastTick = now(); }
+  if (!loopId) startLoop();
   persist();
   render();
 }
 
 function addRest(sec) {
-  if (!S || S.mode !== 'timed') return;
+  if (!S || !onPhaseClock()) return;
   if (S.paused) S.remainingMs += sec * 1000; else S.phaseEndsAt += sec * 1000;
   S.phaseStart += 0;
   persist();
@@ -334,19 +408,30 @@ function addRest(sec) {
 function startPacedTimer() {
   const st = S.steps[S.i];
   cue.unlock();
+  if (S.paused) { S.paused = false; S.lastTick = now(); }
   S.pacedTotal = st.workSec * 1000;
   S.pacedEndsAt = now() + S.pacedTotal;
   S.pacedRemaining = null;
   S.pacedHalf = false;
-  if (settings().sound) cue.goBeep();
+  S.lastSecond = null;
+  if (soundOn()) cue.goBeep();
+  if (!loopId) startLoop();
+  persist();
+  render();
+  renderAccessory();
+}
+
+function toggleMute() {
+  const muted = !settings().muted;
+  update((s) => { s.settings.muted = muted; });
+  if (muted) cue.stopSpeech();
+  toast(muted ? 'Sounds and voice off' : 'Sounds and voice on', { iconName: muted ? 'volume-x' : 'volume-2', duration: 1600 });
   render();
 }
 
-function pacedTimerDone() {
-  S.pacedEndsAt = null;
-  if (settings().sound) cue.goBeep();
-  if (settings().haptics) cue.haptic([15, 40, 15]);
-  render();
+function muteButton() {
+  const m = !!settings().muted;
+  return `<button class="icon-btn glass glass-interactive" data-action="pl-mute" aria-label="${m ? 'Unmute' : 'Mute'}" aria-pressed="${m}">${icon(m ? 'volume-x' : 'volume-2')}</button>`;
 }
 
 async function endWorkout() {
@@ -444,9 +529,9 @@ function topBar() {
     <button class="icon-btn glass glass-interactive" data-action="pl-min" aria-label="Minimise workout">${icon('chevron-down')}</button>
     <div class="pl-head-mid">
       <div class="pl-bar"><i data-pl-progress style="width:${Math.round(progress() * 100)}%"></i></div>
-      <div class="pl-head-label"><span>${exNo ? `Exercise ${exNo} of ${exTotal}` : esc(S.title)}</span><span class="num" data-pl-elapsed>${fmtDuration(S.activeMs / 1000)}</span></div>
+      <div class="pl-head-label"><span>${exNo ? `Exercise ${exNo} of ${exTotal}` : esc(S.title)}</span><span class="pl-clock" aria-label="Workout time">${icon('timer', 'xs')}<span class="num" data-pl-elapsed>${fmtDuration(S.activeMs / 1000)}</span></span></div>
     </div>
-    <button class="toolbar-pill glass glass-interactive" data-action="pl-end">End</button>
+    <div class="pl-top-actions">${muteButton()}<button class="toolbar-pill glass glass-interactive" data-action="pl-end">End</button></div>
   </header>`;
 }
 
@@ -457,7 +542,7 @@ function selectView() {
   return `<div class="pl-select">
     <header class="pl-top">
       <button class="icon-btn glass glass-interactive" data-action="pl-close" aria-label="Close">${icon('x')}</button>
-      <span></span><span style="width:44px"></span>
+      <span></span>${muteButton()}
     </header>
     <div class="pl-select-head">
       <div class="eyebrow accent">${esc(relativeLabel(S.key))}</div>
@@ -478,7 +563,7 @@ function selectView() {
     </div>
     <div class="pl-outline">
       ${main.map((b) => `<div class="pl-outline-block"><div class="eyebrow">${esc(b.name)}${b.format === 'circuit' && b.rounds > 1 ? ` · ${b.rounds} rounds` : ''}</div>
-        ${b.items.map((it) => `<div class="pl-outline-item"><span class="truncate">${esc(EX[it.exId]?.name || it.exId)}</span><span class="sec num">${b.format === 'circuit' ? '' : `${it.sets} × `}${it.mode === 'time' ? `${it.duration}s` : it.reps}${EX[it.exId]?.perSide ? '/side' : ''}</span></div>`).join('')}
+        ${b.items.map((it) => `<div class="pl-outline-item"><span class="truncate">${esc(EX[it.exId]?.name || it.exId)}</span><span class="sec num">${b.format === 'circuit' ? '' : `${it.sets} × `}${it.mode === 'time' ? `${it.duration}s` : it.reps}${perSideAmount(it, EX[it.exId]) ? '/side' : ''}</span></div>`).join('')}
       </div>`).join('')}
     </div>
   </div>`;
@@ -487,7 +572,7 @@ function selectView() {
 function runView(phase) {
   const st = S.steps[S.i];
   const timed = S.mode === 'timed';
-  if (!timed) return pacedView(st);
+  if (!timed && st.kind === 'work') return pacedView(st);
   const isReady = S.phase === 'ready';
   const work = isReady ? S.steps[0] : st.kind === 'work' ? st : S.steps[st.next];
   const label = isReady ? 'Get Ready' : st.kind === 'rest' ? (st.label || 'Rest') : st.ramp ? 'Ramp-Up' : 'Work';
@@ -522,12 +607,24 @@ function runView(phase) {
         : st?.kind === 'rest' ? `<div class="pl-rest-actions"><button class="toolbar-pill glass glass-interactive" data-action="pl-add" data-sec="15">+15 s</button>${work ? `<button class="toolbar-pill glass glass-interactive" data-action="pl-howto" data-ex="${work.exId}">${icon('circle-play', 'sm')} Preview</button>` : ''}</div>` : '<div style="height:44px"></div>'}
       ${nextUp}
     </main>
-    <footer class="pl-controls">
+    ${timed ? `<footer class="pl-controls">
       <button class="pl-btn glass glass-interactive" data-action="pl-prev" aria-label="Previous">${icon('skip-back')}</button>
       <button class="pl-btn big glass glass-prominent glass-interactive" data-action="pl-pause" aria-label="${S.paused ? 'Resume' : 'Pause'}">${icon(S.paused ? 'play' : 'pause', 'lg')}</button>
       <button class="pl-btn glass glass-interactive" data-action="pl-next" aria-label="Skip to next">${icon('skip-forward')}</button>
-    </footer>
+    </footer>` : pacedControls(st)}
   </div>`;
+}
+
+/** Own pace: back · Done / Skip Rest / Finish · pause. */
+function pacedControls(st) {
+  const rest = st.kind === 'rest';
+  const last = !rest && !workLeftAfter(S.i);
+  const [label, ic] = rest ? ['Skip Rest', 'skip-forward'] : last ? ['Finish', 'flag'] : ['Done', 'check'];
+  return `<footer class="pl-controls paced">
+    <button class="pl-btn glass glass-interactive" data-action="pl-prev" aria-label="Previous set" ${S.i === 0 ? 'disabled' : ''}>${icon('skip-back')}</button>
+    <button class="pl-next-btn glass glass-prominent glass-interactive" data-action="pl-next">${label} ${icon(ic, 'sm')}</button>
+    <button class="pl-btn glass glass-interactive" data-action="pl-pause" aria-label="${S.paused ? 'Resume' : 'Pause'}">${icon(S.paused ? 'play' : 'pause')}</button>
+  </footer>`;
 }
 
 function upNext() {
@@ -555,9 +652,6 @@ const setLabel = (st) => (st.sets > 1 ? `${st.circuit ? 'Round' : 'Set'} ${st.se
 const amountShort = (st) => `${st.mode === 'time' ? `${st.duration} s` : `${st.reps} reps`}${st.perSide ? ' / side' : ''}`;
 
 function pacedView(st) {
-  const isLast = S.i >= S.steps.length - 1;
-  const nextSt = S.steps[S.i + 1];
-  const nextLabel = isLast ? 'Finish Workout' : nextSt.exId === st.exId ? `Next ${st.circuit ? 'Round' : 'Set'}` : 'Next Exercise';
   const timerOn = !!(S.pacedEndsAt || S.pacedRemaining != null);
   return `<div class="pl-run paced">
     ${topBar()}
@@ -571,16 +665,13 @@ function pacedView(st) {
         ${timerOn
           ? `<div class="pl-big rounded num" data-pl-big>0</div><div class="pl-small" data-pl-small>seconds left</div>`
           : `<div class="pl-big rounded num">${st.mode === 'time' ? st.duration : st.reps}</div>
-             <div class="pl-small">${st.mode === 'time' ? 'seconds' : 'reps'}${st.perSide ? ' each side' : ''}</div>`}
+             <div class="pl-small">${st.mode === 'time' ? 'seconds' : 'reps'}${st.perSide ? ' each side' : ''}${st.alternating ? ' · alternating' : ''}</div>`}
         ${st.mode === 'time' && !timerOn ? `<button class="btn btn-tinted sm" data-action="pl-timer">${icon('timer', 'xs')} Start Timer</button>` : ''}
       </div>
       <button class="toolbar-pill glass glass-interactive pl-howto" data-action="pl-howto" data-ex="${st.exId}">${icon('circle-play', 'sm')} How to</button>
-      ${S.i < S.steps.length - 1 ? upNext() : `<div class="pl-next"><div class="eyebrow">Up Next</div><div class="pl-next-row"><span class="pl-next-icon done">${icon('flag')}</span><div class="grow"><div class="t-headline">Finish</div><div class="t-foot sec">This is your last set</div></div></div></div>`}
+      ${upNext()}
     </main>
-    <footer class="pl-controls paced">
-      <button class="pl-btn glass glass-interactive" data-action="pl-prev" aria-label="Previous set" ${S.i === 0 ? 'disabled' : ''}>${icon('skip-back')}</button>
-      <button class="pl-next-btn glass glass-prominent glass-interactive" data-action="pl-next">${esc(nextLabel)} ${icon(isLast ? 'flag' : 'arrow-right', 'sm')}</button>
-    </footer>
+    ${pacedControls(st)}
   </div>`;
 }
 
@@ -620,11 +711,12 @@ function live() {
   const ring = el.querySelector('[data-pl-ring]');
   const st = S.steps[S.i];
 
-  if (S.mode !== 'timed') {
+  if (S.mode !== 'timed' && st.kind === 'work') {
     if (S.pacedEndsAt || S.pacedRemaining != null) {
       const rem = S.pacedEndsAt ? Math.max(0, S.pacedEndsAt - t) : S.pacedRemaining;
       if (big) big.textContent = Math.ceil(rem / 1000);
       if (st.perSide && small) small.textContent = rem > S.pacedTotal / 2 ? 'Left side' : 'Right side';
+      else if (st.alternating && small) small.textContent = 'seconds left · alternate sides';
     }
     return;
   }
@@ -641,7 +733,7 @@ function live() {
   } else {
     if (big) { big.textContent = secs >= 60 ? fmtDuration(secs) : secs; big.classList.toggle('long', secs >= 60); }
     if (small) small.textContent = S.phase === 'ready' ? 'seconds' : st.kind === 'rest' ? (secs >= 60 ? 'rest' : 'seconds rest') : `of ${st.duration}s${st.perSide ? ' each side' : ''}`;
-    if (side) side.textContent = st.kind === 'work' && st.perSide ? (t - S.phaseStart < st.workSec * 500 ? 'Left side' : 'Right side') : '';
+    if (side) side.textContent = st.kind !== 'work' ? '' : st.perSide ? (t - S.phaseStart < st.workSec * 500 ? 'Left side' : 'Right side') : st.alternating ? 'Alternate sides' : '';
   }
   if (big) big.classList.toggle('pulse', secs <= 3 && !(S.phase === 'run' && st.kind === 'work' && st.mode === 'reps'));
 }
@@ -650,7 +742,7 @@ function live() {
 
 function accessoryTime() {
   if (!S || S.phase === 'select' || S.phase === 'done') return '';
-  if (S.mode !== 'timed') return fmtDuration(S.activeMs / 1000);
+  if (S.mode !== 'timed' && !resting()) return fmtDuration(S.activeMs / 1000);
   const rem = S.paused ? S.remainingMs : Math.max(0, S.phaseEndsAt - now());
   return fmtDuration(rem / 1000);
 }
@@ -659,7 +751,7 @@ export function accessoryHtml() {
   if (!S || el || S.phase === 'select' || S.phase === 'done') return '';
   const st = S.steps[S.i];
   const title = S.phase === 'ready' ? 'Get Ready' : st?.kind === 'rest' ? 'Rest' : st?.name || S.title;
-  const sub = S.paused ? 'Paused' : S.mode === 'timed' ? (st?.kind === 'rest' ? 'Resting' : 'Working') : 'Own pace';
+  const sub = S.paused ? 'Paused' : st?.kind === 'rest' ? 'Resting' : S.mode === 'timed' ? 'Working' : 'Own pace';
   return `<div class="accessory"><div class="accessory-inner glass">
     <button class="acc-open" data-action="pl-open" aria-label="Open workout">
       <span class="acc-icon ${st?.kind === 'rest' ? 'rest' : ''}">${icon(st?.kind === 'rest' ? 'hourglass' : 'dumbbell')}</span>
@@ -691,9 +783,11 @@ export const actions = {
   'pl-prev': () => prev(),
   'pl-add': (b) => addRest(+b.dataset.sec),
   'pl-timer': () => startPacedTimer(),
+  'pl-mute': () => toggleMute(),
   'pl-done': () => { hide(true); S = null; renderAccessory(); },
   'pl-howto': (b) => {
-    if (S && !S.paused && S.phase !== 'select' && S.phase !== 'done') togglePause();
+    // Pause only if something is counting down; an untimed own-pace set keeps the workout clock running
+    if (S && !S.paused && S.phase !== 'select' && S.phase !== 'done' && countdownRunning()) togglePause();
     openSheet(exerciseView(b.dataset.ex), { detent: 'large' });
   },
 };

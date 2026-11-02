@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = {
   haptics: true,
   wakeLock: true,
   repTick: true,        // soft tick for each rep in timed mode
+  muted: false,         // quick mute from the workout screen (silences beeps and voice, keeps the settings above)
   hidden: [],           // exercise ids never to suggest or add
 };
 

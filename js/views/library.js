@@ -138,7 +138,7 @@ export function exerciseView(exId, { extraTop = '' } = {}) {
       const tags = [
         ...ex.equipment.map((q) => `<span class="tag">${icon(EQUIP_ICON[q] || 'dumbbell')}${esc(EQ[q]?.name || titleCase(q))}</span>`),
         `<span class="tag">${icon('gauge')}${esc(LEVELS[ex.level])}</span>`,
-        ex.perSide ? `<span class="tag">${icon('arrow-left-right')}Each side</span>` : '',
+        ex.perSide ? `<span class="tag">${icon('arrow-left-right')}${ex.alternating ? 'Alternating' : 'Each side'}</span>` : '',
         `<span class="tag">${icon(ex.type === 'time' ? 'timer' : 'repeat')}${ex.type === 'time' ? `${ex.defaults.duration ?? 30} s` : `${ex.defaults.reps ?? 10} reps`} default</span>`,
       ].join('');
       return `${extraTop}

@@ -106,8 +106,16 @@ const isCompound = (ex) => !['core', 'cardio', 'mobility', 'stretch'].includes(e
 
 /* ---------- Timing ---------- */
 
+/**
+ * Is the amount per side? Alternating moves (shoulder taps, dead bugs) count reps per side,
+ * but a timed set is one block of time with no left/right halves.
+ */
+export function perSideAmount(item, ex) {
+  return !!ex?.perSide && !item?.oneSide && !(ex.alternating && item?.mode === 'time');
+}
+
 export function workSeconds(item, ex) {
-  const sides = ex?.perSide && !item.oneSide ? 2 : 1;
+  const sides = perSideAmount(item, ex) ? 2 : 1;
   if (item.mode === 'time') return Math.round((item.duration || 30) * sides);
   return Math.max(6, Math.round((item.reps || 10) * (ex?.tempo || 3) * sides));
 }
@@ -698,7 +706,7 @@ export function flatten(day, exMap) {
     const push = (it, extra) => {
       const ex = exMap[it.exId];
       steps.push({
-        kind: 'work', exId: it.exId, name: ex?.name || it.exId, perSide: !!ex?.perSide && !it.oneSide, oneSide: !!it.oneSide,
+        kind: 'work', exId: it.exId, name: ex?.name || it.exId, perSide: perSideAmount(it, ex), alternating: !!ex?.alternating, oneSide: !!it.oneSide,
         mode: it.mode, reps: it.reps, duration: it.duration, workSec: workSeconds(it, ex), ramp: !!it.ramp, atTop: !!it.atTop,
         block: b.name, blockKind: b.kind, pair: !!b.pair, ...extra,
       });

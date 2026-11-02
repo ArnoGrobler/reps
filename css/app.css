@@ -982,7 +982,10 @@ button.widget:active { transform: scale(0.97); }
 .pl-head-mid { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .pl-bar { height: 6px; border-radius: 3px; background: var(--fill-3); overflow: hidden; }
 .pl-bar i { display: block; height: 100%; border-radius: inherit; background: var(--phase); transition: width 0.6s var(--spring-smooth), background-color 0.4s; }
-.pl-head-label { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; color: var(--label-2); white-space: nowrap; }
+.pl-head-label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--label-2); white-space: nowrap; }
+.pl-clock { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 15px; font-weight: 700; color: var(--label); }
+.pl-clock .ic { width: 14px; height: 14px; stroke-width: 2.4; }
+.pl-top-actions { display: flex; align-items: center; gap: 8px; }
 .pl-head-label span:first-child { overflow: hidden; text-overflow: ellipsis; }
 
 .pl-select { overflow-y: auto; }
@@ -1069,7 +1072,8 @@ button.widget:active { transform: scale(0.97); }
 .pl-btn.big .ic { width: 38px; height: 38px; }
 .pl-btn:disabled { opacity: 0.35; }
 .player .glass-prominent { background: color-mix(in srgb, var(--phase) 90%, transparent); box-shadow: 0 14px 32px -12px color-mix(in srgb, var(--phase) 70%, transparent), inset 1.5px 1.5px 1px -1px rgba(255, 255, 255, 0.6), inset -1.5px -1.5px 1px -1px rgba(255, 255, 255, 0.25); }
-.player[data-phase="ready"] .glass-prominent { color: #000; }
+/* Teal and yellow are light: dark text keeps labels readable (about 10:1 vs about 2:1 for white) */
+.player[data-phase="ready"] .glass-prominent, .player[data-phase="rest"] .glass-prominent { color: #000; }
 .pl-controls.paced { gap: 16px; }
 .pl-next-btn {
   flex: 1; max-width: 360px; height: 72px; border-radius: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;

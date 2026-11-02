@@ -2,7 +2,7 @@
 
 import { icon } from '../icons.js';
 import { esc, openSheet, pushSheet, popSheet, closeSheet, sheetIsOpen, toast } from '../ui.js';
-import { EX, EQ, EQUIP_ICON, allowedExercises } from '../data.js';
+import { EX, EQ, EQUIP_ICON, allowedExercises, sideText } from '../data.js';
 import { TEMPLATES, TEMPLATE, EVIDENCE_LABEL } from '../data/templates.js';
 import { templateDay, canDo, LEVELS } from '../generator.js';
 import { getState, update, getDay, isDone } from '../store.js';
@@ -38,7 +38,7 @@ function structureHtml(tpl, s) {
     <div class="section-head"><div class="section-title">${esc(b.name)}</div><span class="t-foot sec">${b.format === 'circuit' && b.rounds > 1 ? `${b.rounds} ${b.pair ? 'sets' : 'rounds'}` : ''}</span></div>
     <div class="list">${b.items.map((it) => {
       const ex = EX[it.exId];
-      const amt = it.mode === 'time' ? `${it.duration} s${ex?.perSide && !it.oneSide ? ' / side' : ''}` : `${it.reps} reps${it.oneSide ? ' (switch hands each set)' : ''}`;
+      const amt = it.mode === 'time' ? `${it.duration} s${sideText(it, ex)}` : `${it.reps} reps${it.oneSide ? ' (switch hands each set)' : ''}`;
       return `<button class="row" data-action="open-exercise" data-ex="${it.exId}"><div class="grow"><div class="title truncate">${esc(ex?.name || it.exId)}</div><div class="subtitle">${esc(amt)}${it.rest ? ` · ${it.rest} s ${b.restLabel ? b.restLabel.toLowerCase() : it.rest <= 20 ? 'to switch' : 'rest'}` : ''}</div></div>${icon('chevron-right', 'chev')}</button>`;
     }).join('')}</div></section>`).join('');
 }

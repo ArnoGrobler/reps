@@ -7,6 +7,9 @@ let wakeLock = null;
 let hapticLabel = null;
 
 export function unlock() {
+  // "ambient" asks the browser to mix our beeps with music from other apps instead of stopping it
+  // (Safari 17+ Audio Session API). Like other ambient sounds on iPhone, beeps then follow the silent switch.
+  try { if (navigator.audioSession && navigator.audioSession.type !== 'ambient') navigator.audioSession.type = 'ambient'; } catch { /* unsupported */ }
   try {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();

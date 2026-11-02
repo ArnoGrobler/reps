@@ -51,9 +51,10 @@ export function settingsView() {
             <div class="row has-icon"><div class="row-icon" style="background:var(--yellow)">${icon('hourglass')}</div>
               <div class="grow"><div class="title">Countdown</div><div class="subtitle">Before timed workouts</div></div>
               <div class="value-stepper"><span class="val rounded">${st.getReady} s</span>${stepperHtml('set:getReady', { canDec: st.getReady > 5, canInc: st.getReady < 30, label: 'countdown seconds' })}</div></div>
+            ${sw('muted', 'Mute', 'Silences beeps and voice. Also on the workout screen', 'volume-x', 'var(--gray)')}
             ${sw('sound', 'Sounds', 'Beeps for the last 3 seconds', 'volume-2', 'var(--red)')}
             ${sw('repTick', 'Rep counter tick', 'Soft tick on each counted rep', 'repeat', 'var(--orange)')}
-            ${sw('voice', 'Voice cues', 'Announces each exercise and rest', 'mic', 'var(--purple)')}
+            ${sw('voice', 'Voice cues', 'Announces each exercise and rest. On iPhone, speech lowers or pauses music', 'mic', 'var(--purple)')}
             ${sw('haptics', 'Haptics', 'Vibration on supported phones', 'vibrate', 'var(--teal)')}
             ${sw('wakeLock', 'Keep screen on', 'During a workout', 'smartphone', 'var(--blue)')}
           </div>
