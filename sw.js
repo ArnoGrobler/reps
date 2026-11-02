@@ -1,7 +1,7 @@
 // Offline support: network first (so updates arrive right away), cache as fallback.
 // GitHub Pages lets browsers reuse files for 10 minutes; every request here asks the
 // server whether the file changed (cheap 304 when it hasn't), so updates are never stuck.
-const CACHE = 'reps-v10';
+const CACHE = 'reps-v11';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/icons.js', './js/ui.js', './js/store.js', './js/dates.js', './js/data.js',

@@ -513,13 +513,16 @@ function fit() {
   const width = main.clientWidth - 40;
   // The set rail sits to the left of the ring; leave room for it on both sides so the ring stays centred
   const rail = stage.querySelector('.pl-rail');
-  const roomForRail = rail ? main.clientWidth - 2 * (rail.offsetWidth + 14) : Infinity;
+  // Room for the rail is kept even on steps without one, so the ring does not jump in size between exercises
+  const roomForRail = main.clientWidth - 2 * (RAIL_WIDTH + 12);
   if (flex.classList.contains('pl-ring-wrap')) {
     main.style.setProperty('--ring', `${Math.floor(Math.max(120, Math.min(avail, width * 0.8, roomForRail, 320)))}px`);
   } else {
     const extra = flex.offsetHeight - (flex.querySelector('.pl-big')?.offsetHeight || 0);
     main.style.setProperty('--target-font', `${Math.floor(Math.max(56, Math.min((avail - extra) * 0.92, width * 0.36, 150)))}px`);
   }
+  // The rail sits flush with the left edge of the screen
+  if (rail) rail.style.left = `${el.getBoundingClientRect().left - stage.getBoundingClientRect().left}px`;
   // Keep the current pill in view
   const list = rail?.querySelector('.rl-list');
   const cur = list?.querySelector('.cur, .next');
@@ -663,7 +666,7 @@ function upNext() {
 
 /* ---------- Set rail ---------- */
 
-const restText = (sec) => (sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : `${sec}s`);
+const RAIL_WIDTH = 62;   // matches .pl-rail in app.css
 
 /** done / cur (on screen) / next (the set coming after a rest, or the first one) / todo */
 function railState(i) {
@@ -674,56 +677,67 @@ function railState(i) {
 }
 
 /**
- * Pills beside the timer for the group on screen: one exercise's sets with the rests between,
- * or a circuit/pair as rounds. The current round is open to show its moves (A, B, C…); finished
- * rounds fold into a green tick. − and + remove or add a set (or round) for this workout.
+ * A glass rail on the left edge, only when there is something to count: an exercise with 2 or
+ * more sets, or a circuit or pair with 2 or more rounds. Rounds of several moves show the current
+ * round open (its moves A, B, C…) and finished rounds folded into a tick. The short line between
+ * pills is the rest between sets or rounds: it lights up while you rest and turns green after.
+ * Single moves (a warm-up or cool-down flow, a one-set exercise) get no rail.
+ * − and + remove or add a set (or round) for this workout.
  */
 function railHtml() {
-  const anchor = S.phase === 'ready' ? S.steps[0] : S.steps[S.i];
+  const ready = S.phase === 'ready';
+  const anchor = ready ? S.steps[0] : S.steps[S.i];
   if (!anchor?.g) return '';   // sessions saved before the rail have no groups
-  const list = [];
-  S.steps.forEach((st, i) => { if (st.g === anchor.g) list.push({ st, i }); });
-  // Only the breaks in between: the rest after the last set leads to the next exercise, so it shows only while you are on it
-  while (list.length && list[list.length - 1].st.kind === 'rest' && list[list.length - 1].i !== S.i) list.pop();
-  const first = list.find((x) => x.st.kind === 'work')?.st;
+  const group = [];
+  S.steps.forEach((st, i) => { if (st.g === anchor.g) group.push({ st, i }); });
+  const work = group.filter((x) => x.st.kind === 'work');
+  const first = work[0]?.st;
   if (!first) return '';
-  const rounds = first.round != null && first.items > 1;   // circuits and pairs with several moves
+  const circuit = first.round != null;
+  if (first.sets < 2) return '';   // one set, or a one-round flow of different moves: nothing to count
+  const rounds = circuit && first.items > 1;
   const word = first.circuit ? 'Round' : 'Set';
-  const pill = ({ st, i }, text, aria) => {
-    const s = railState(i);
-    if (st.kind === 'rest') {
-      return `<div class="rl-rest ${s}" role="listitem" aria-label="${st.sec} seconds ${esc(st.label.toLowerCase())}${s === 'done' ? ', done' : ''}">${s === 'done' ? icon('check') : restText(st.sec)}</div>`;
-    }
-    return `<div class="rl-set ${s}" role="listitem" aria-label="${esc(aria)}${s === 'done' ? ', done' : s === 'cur' ? ', now' : ''}">${s === 'done' ? icon('check') : esc(text)}</div>`;
+  const pill = (x, text, aria) => {
+    const s = railState(x.i);
+    return `<div class="rl-pill ${s}" role="listitem" aria-label="${esc(aria)}${s === 'done' ? ', done' : s === 'cur' ? ', now' : ''}">${s === 'done' ? icon('check') : esc(text)}</div>`;
+  };
+  const link = (a, b) => {
+    const rest = group.find((x) => x.i > a.i && x.i < b.i);
+    const s = rest ? railState(rest.i) : ['done', 'cur'].includes(railState(b.i)) ? 'done' : 'todo';
+    return `<i class="rl-link ${s}" aria-hidden="true"></i>`;
   };
   let html;
   if (!rounds) {
-    html = list.map((x) => pill(x, String(x.st.set), `${x.st.round != null ? word : 'Set'} ${x.st.set}`)).join('');
+    // Sets 1, 2, 3 of one exercise (or rounds of a one-move circuit), with the rests between
+    html = work.map((x, k) => `${k ? link(work[k - 1], x) : ''}${pill(x, String(x.st.set), `${circuit ? word : 'Set'} ${x.st.set}`)}`).join('');
   } else {
     const byRound = [];
-    for (const x of list) (byRound[x.st.round - 1] ||= []).push(x);
-    const curRound = S.phase === 'ready' ? 1 : anchor.round;
+    for (const x of work) (byRound[x.st.round - 1] ||= []).push(x);
+    // During the rest after a round, the next round is the open one
+    const showing = anchor.kind === 'rest' && S.steps[anchor.next]?.g === anchor.g ? S.steps[anchor.next] : anchor;
+    const curRound = ready ? 1 : showing.round;
     const openKey = `${anchor.g}:${curRound}`;
     const opening = S.railOpen !== openKey;
     S.railOpen = openKey;
+    // Moves inside a round sit together; the line between rounds is the rest between rounds
     html = byRound.map((xs, k) => {
       const r = k + 1;
-      const head = `<span class="rl-word">${word}</span><span>${r}</span>`;
+      const gap = k ? link(byRound[k - 1][byRound[k - 1].length - 1], xs[0]) : '';
       if (r === curRound) {
-        return `<div class="rl-round${opening ? ' opening' : ''}" role="listitem" aria-label="${word} ${r} of ${byRound.length}"><div class="rl-round-head">${head}</div>
-          ${xs.map((x) => pill(x, String.fromCharCode(65 + x.st.ii), x.st.name)).join('')}</div>`;
+        return `${gap}<div class="rl-round${opening ? ' opening' : ''}" role="listitem" aria-label="${word} ${r} of ${byRound.length}">
+          <div class="rl-cap">${word} ${r}</div>${xs.map((x) => pill(x, String.fromCharCode(65 + x.st.ii), x.st.name)).join('')}</div>`;
       }
-      const done = S.phase !== 'ready' && xs.every((x) => x.i < S.i);
-      return `<div class="rl-set rl-fold ${done ? 'done' : 'todo'}" role="listitem" aria-label="${word} ${r}${done ? ', done' : ''}">${done ? icon('check') : head}</div>`;
+      const done = !ready && xs.every((x) => x.i < S.i);
+      return `${gap}<div class="rl-pill rl-fold ${done ? 'done' : 'todo'}" role="listitem" aria-label="${word} ${r}${done ? ', done' : ''}">${done ? icon('check') : `<span class="rl-word">${word}</span><span>${r}</span>`}</div>`;
     }).join('');
   }
-  const unit = (rounds || first.round != null ? word : 'set').toLowerCase();
+  const unit = (circuit ? word : 'set').toLowerCase();
   const total = first.sets;
-  const canRemove = total > Math.max(1, S.phase === 'ready' ? 1 : anchor.set);
-  return `<div class="pl-rail">
-    <button class="rl-btn glass glass-interactive" data-action="pl-sets" data-delta="-1" aria-label="Remove a ${unit}" ${canRemove ? '' : 'disabled'}>${icon('minus')}</button>
+  const canRemove = total > Math.max(1, ready ? 1 : anchor.set);
+  return `<div class="pl-rail glass">
+    <button class="rl-btn" data-action="pl-sets" data-delta="-1" aria-label="Remove a ${unit}" ${canRemove ? '' : 'disabled'}>${icon('minus')}</button>
     <div class="rl-list" role="list" aria-label="${rounds ? `${word}s` : 'Sets'}">${html}</div>
-    <button class="rl-btn glass glass-interactive" data-action="pl-sets" data-delta="1" aria-label="Add a ${unit}" ${total >= 20 ? 'disabled' : ''}>${icon('plus')}</button>
+    <button class="rl-btn" data-action="pl-sets" data-delta="1" aria-label="Add a ${unit}" ${total >= 20 ? 'disabled' : ''}>${icon('plus')}</button>
   </div>`;
 }
 
