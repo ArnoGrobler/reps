@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS = {
   wakeLock: true,
   repTick: true,        // soft tick for each rep in timed mode
   muted: false,         // quick mute from the workout screen (silences beeps and voice, keeps the settings above)
+  distanceUnit: null,   // km | mi for logged runs, walks and rides (null = from the language)
   hidden: [],           // exercise ids never to suggest or add
 };
 
@@ -239,7 +240,7 @@ export function inPlan(key, s = state) {
   return !!r && key >= r.start && key <= r.end;
 }
 
-/** Day status for calendars: done | rest-done | planned | rest | missed | rest-missed | today-* | none */
+/** Day status for calendars: done | rest-done | planned | rest | missed | rest-missed | none. Activity days count like workouts. */
 export function dayStatus(key, s = state, today = todayKey()) {
   const day = getDay(key, s);
   const done = isDone(key, s);
@@ -271,7 +272,7 @@ export function weekSummary(s = state, today = todayKey()) {
     const d = getDay(k, s);
     const log = s.log[k];
     const mins = log?.completed ? Math.round((log.durationSec ?? (d?.minutes || 0) * 60) / 60) : 0;
-    if (d?.type === 'workout') { planned++; if (log?.completed) done++; }
+    if (d?.type === 'workout' || d?.type === 'activity') { planned++; if (log?.completed) done++; }
     else if (!d && log?.completed && mins) done++;
     minutes += d?.type === 'rest' ? 0 : mins;
     return { key: k, minutes: d?.type === 'rest' ? 0 : mins, status: dayStatus(k, s, today) };
@@ -300,7 +301,8 @@ export function planProgress(s = state, today = todayKey()) {
   const r = planRange(s);
   let total = 0, done = 0;
   for (const [k, d] of Object.entries(s.plan.days)) {
-    if (d.type !== 'workout') continue;
+    // An activity you did instead of a planned workout still counts toward the plan
+    if (d.type !== 'workout' && !(d.type === 'activity' && d.prev?.type === 'workout')) continue;
     total++;
     if (isDone(k, s)) done++;
   }

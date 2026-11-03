@@ -66,7 +66,7 @@ function monthHtml(s, m, today) {
     else if (st === 'rest-missed') mark = `<span class="cal-mark rest dim">${icon('moon')}</span>`;
     else if (st === 'missed') mark = '<span class="cal-mark miss"></span>';
     const label = `${fmtLong(key)}${day ? ` — ${day.type === 'rest' ? 'Rest day' : day.title}` : ''}${st.includes('done') ? ', completed' : ''}`;
-    cells.push(`<button class="cal-cell st-${st} ${day?.type === 'workout' ? 'is-workout' : ''} ${key === today ? 'is-today' : ''} ${key < today ? 'is-past' : ''}"
+    cells.push(`<button class="cal-cell st-${st} ${day?.type === 'workout' || day?.type === 'activity' ? 'is-workout' : ''} ${key === today ? 'is-today' : ''} ${key < today ? 'is-past' : ''}"
       data-action="open-day" data-key="${key}" aria-label="${esc(label)}">
       <span class="cal-num">${d}</span>${mark}
     </button>`);

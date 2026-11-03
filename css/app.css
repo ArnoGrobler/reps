@@ -967,6 +967,22 @@ button.widget:active { transform: scale(0.97); }
 .equip-option .option-check { position: absolute; top: 14px; right: 14px; }
 .equip-option[aria-disabled="true"] { cursor: default; }
 .day-row { gap: 14px; }
+/* Manual activities */
+.act-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.act-tile {
+  display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 18px; text-align: left;
+  background: var(--bg-elev); box-shadow: inset 0 0 0 0.5px var(--sep); transition: transform 0.4s var(--spring);
+}
+.act-tile:active { transform: scale(0.96); }
+.act-badge { width: 40px; height: 40px; border-radius: 12px; flex: none; display: grid; place-items: center; color: #fff; }
+.act-badge .ic { width: 22px; height: 22px; }
+.act-badge.lg { width: 56px; height: 56px; border-radius: 17px; }
+.act-badge.lg .ic { width: 30px; height: 30px; }
+.act-head { display: flex; align-items: center; gap: 14px; }
+.act-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.act-stats div { background: var(--fill-3); border-radius: 16px; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; text-align: center; }
+.act-stats b { font-size: 20px; line-height: 24px; font-weight: 800; white-space: nowrap; }
+.act-stats span { font-size: 12px; font-weight: 600; color: var(--label-2); }
 .routine-summary { display: flex; flex-direction: column; gap: 10px; }
 .tag.ok { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
 .tag.miss { color: var(--orange); background: color-mix(in srgb, var(--orange) 14%, transparent); }

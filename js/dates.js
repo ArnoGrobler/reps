@@ -99,5 +99,5 @@ export function fmtDuration(sec) {
 export function fmtMinutes(sec) {
   const m = Math.round(sec / 60);
   if (m < 60) return `${m} min`;
-  return `${Math.floor(m / 60)} h ${m % 60} min`;
+  return `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`;
 }

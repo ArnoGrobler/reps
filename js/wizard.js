@@ -110,9 +110,9 @@ function buildPreview() {
     style: wz.style, routine: wz.style === 'same' ? JSON.parse(JSON.stringify(wz.routine)) : undefined,
   }, allowedExercises(s.settings));
   if (wz.fromPlan && s.plan) {
-    // Keep the days that already happened exactly as they were.
+    // Keep the days that already happened exactly as they were, and activities you logged or planned by hand.
     const t = todayKey();
-    for (const [k, d] of Object.entries(s.plan.days)) if (k < t && plan.days[k]) plan.days[k] = d;
+    for (const [k, d] of Object.entries(s.plan.days)) if ((k < t || d.type === 'activity') && plan.days[k]) plan.days[k] = d;
     plan.id = s.plan.id;
   }
   wz.preview = plan;

@@ -6,6 +6,7 @@ import { EX, EQ, rxText, mainEquip, EQUIP_ICON } from '../data.js';
 import { todayKey, addDays, fmt, fmtLong, relativeLabel, weekdayLetters, diffDays, fmtMinutes } from '../dates.js';
 import { getDay, isDone, upNext, weekSummary, streaks, planProgress, weekIndexOf, dayStatus, totals } from '../store.js';
 import { countExercises, estimateSeconds, FOCUS } from '../generator.js';
+import { activityMeta, activityIcon, activityColor } from './activity.js';
 
 export function renderToday(s) {
   const today = todayKey();
@@ -115,7 +116,15 @@ function upNextCards(s, today) {
     return out.join('');
   }
 
-  if (todayDay?.type === 'rest') {
+  if (todayDay?.type === 'activity') {
+    out.push(`<button class="card hero ${doneToday ? 'done-card' : ''} pressable" data-action="open-day" data-key="${today}" style="text-align:left">
+      <div class="rest-head">
+        <div class="act-badge" style="background:${activityColor(todayDay)}">${icon(activityIcon(todayDay))}</div>
+        <div style="min-width:0"><div class="eyebrow">${doneToday ? 'Today · Complete' : 'Today'}</div><div class="t-title2 truncate">${esc(todayDay.title)}</div></div>
+      </div>
+      <div class="hero-meta">${activityMeta(todayDay).map((t, i) => `<span>${icon(['timer', 'route', 'gauge'][i])} ${esc(t)}</span>`).join('')}</div>
+    </button>`);
+  } else if (todayDay?.type === 'rest') {
     out.push(`<div class="card hero rest-card">
       <div class="rest-head">
         <div class="rest-icon">${icon('moon')}</div>
@@ -215,10 +224,11 @@ function comingUp(s, today) {
     const d = getDay(k, s);
     if (!d) continue;
     const rest = d.type === 'rest';
+    const act = d.type === 'activity';
     const st = dayStatus(k, s, today);
     rows.push(`<button class="row has-icon" data-action="open-day" data-key="${k}">
-      <div class="row-icon" style="background:${rest ? 'var(--indigo)' : 'var(--accent)'}">${icon(rest ? 'moon' : 'dumbbell')}</div>
-      <div class="grow"><div class="title truncate">${esc(rest ? 'Rest Day' : d.title)}</div><div class="subtitle">${esc(relativeLabel(k, today))}${rest ? '' : ` · ${Math.round((d.estSec || 0) / 60)} min`}</div></div>
+      <div class="row-icon" style="background:${act ? activityColor(d) : rest ? 'var(--indigo)' : 'var(--accent)'}">${icon(act ? activityIcon(d) : rest ? 'moon' : 'dumbbell')}</div>
+      <div class="grow"><div class="title truncate">${esc(rest ? 'Rest Day' : d.title)}</div><div class="subtitle">${esc(relativeLabel(k, today))}${rest ? '' : ` · ${act ? esc(activityMeta(d).join(' · ')) : `${Math.round((d.estSec || 0) / 60)} min`}`}</div></div>
       ${st === 'done' || st === 'rest-done' ? `<span style="color:var(--green)">${icon('circle-check')}</span>` : ''}
       ${icon('chevron-right', 'chev')}
     </button>`);

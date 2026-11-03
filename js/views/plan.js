@@ -6,6 +6,7 @@ import { EQ, EQUIP_ICON, EQUIP_COLOR } from '../data.js';
 import { todayKey, addDays, fmt, fmtMonthDay, weekdayLetters, diffDays } from '../dates.js';
 import { getState, update, planProgress, isDone, getDay, planRange } from '../store.js';
 import { GOALS, LEVELS, LOADS, countExercises, weeklySets } from '../generator.js';
+import { activityMeta } from './activity.js';
 import { EX } from '../data.js';
 import { openWizard } from '../wizard.js';
 
@@ -65,7 +66,7 @@ export function renderPlan(s) {
       <div class="chips scroll week-chips" role="tablist" aria-label="Weeks">
         ${Array.from({ length: p.weeks }, (_, w) => {
           const wDays = Array.from({ length: 7 }, (_, i) => addDays(p.startDate, w * 7 + i));
-          const workouts = wDays.filter((k) => getDay(k, s)?.type === 'workout');
+          const workouts = wDays.filter((k) => ['workout', 'activity'].includes(getDay(k, s)?.type));
           const allDone = workouts.length && workouts.every((k) => isDone(k, s));
           const deload = wDays.some((k) => getDay(k, s)?.deload);
           return `<button class="chip ${w === ui.week ? 'is-on' : ''}" role="tab" aria-selected="${w === ui.week}" data-action="plan-week" data-week="${w}">
@@ -84,7 +85,7 @@ export function renderPlan(s) {
             return `<button class="row plan-row" data-action="open-day" data-key="${k}">
               <div class="date-badge ${k === today ? 'today' : ''}"><span>${esc(fmt(k, { weekday: 'short' }))}</span><b class="rounded">${fmt(k, { day: 'numeric' })}</b></div>
               <div class="grow"><div class="title truncate ${rest ? 'sec' : ''}">${esc(rest ? 'Rest Day' : d.title)}</div>
-                <div class="subtitle truncate">${rest ? esc(d.note || 'Recover') : `${Math.round((d.estSec || 0) / 60)} min · ${countExercises(d)} exercises`}</div></div>
+                <div class="subtitle truncate">${rest ? esc(d.note || 'Recover') : d.type === 'activity' ? esc(activityMeta(d).join(' · ')) : `${Math.round((d.estSec || 0) / 60)} min · ${countExercises(d)} exercises`}</div></div>
               ${done ? `<span style="color:var(--green)">${icon('circle-check')}</span>` : rest ? `<span class="ter">${icon('moon')}</span>` : ''}
               ${icon('chevron-right', 'chev')}
             </button>`;

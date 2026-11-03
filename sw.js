@@ -1,13 +1,13 @@
 // Offline support: network first (so updates arrive right away), cache as fallback.
 // GitHub Pages lets browsers reuse files for 10 minutes; every request here asks the
 // server whether the file changed (cheap 304 when it hasn't), so updates are never stuck.
-const CACHE = 'reps-v14';
+const CACHE = 'reps-v15';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/icons.js', './js/ui.js', './js/store.js', './js/dates.js', './js/data.js',
   './js/generator.js', './js/audio.js', './js/player.js', './js/wizard.js', './js/sync.js', './js/data/exercises.js', './js/data/templates.js',
   './js/views/today.js', './js/views/calendar.js', './js/views/plan.js', './js/views/library.js',
-  './js/views/day.js', './js/views/editor.js', './js/views/settings.js', './js/views/profiles.js', './js/views/sync.js', './js/views/proven.js',
+  './js/views/day.js', './js/views/editor.js', './js/views/settings.js', './js/views/profiles.js', './js/views/sync.js', './js/views/proven.js', './js/views/activity.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
 ];
 

@@ -17,6 +17,7 @@ import { haptic } from './audio.js';
 import * as profiles from './views/profiles.js';
 import * as syncViews from './views/sync.js';
 import * as proven from './views/proven.js';
+import * as activity from './views/activity.js';
 import { startAutoSync, syncProfile } from './sync.js';
 import { yogaCooldowns } from './generator.js';
 import { allowedExercises } from './data.js';
@@ -36,14 +37,14 @@ let tab = ALL.some((t) => t.id === location.hash.slice(1)) ? location.hash.slice
 
 const ACTIONS = {
   ...calendarActions, ...planActions, ...libraryActions, ...dayActions,
-  ...editor.actions, ...settings.actions, ...wizard.actions, ...player.actions, ...profiles.actions, ...syncViews.actions, ...proven.actions,
+  ...editor.actions, ...settings.actions, ...wizard.actions, ...player.actions, ...profiles.actions, ...syncViews.actions, ...proven.actions, ...activity.actions,
   'go-tab': (el) => go(el.dataset.tab),
   'open-settings': () => openSheet(settings.settingsView(), { detent: 'large' }),
 };
-const STEP = [editor.onStep, settings.onStep, wizard.onStep];
-const SEG = [editor.onSeg, settings.onSeg, wizard.onSeg];
+const STEP = [editor.onStep, settings.onStep, wizard.onStep, activity.onStep];
+const SEG = [editor.onSeg, settings.onSeg, wizard.onSeg, activity.onSeg];
 const TOGGLE = [editor.onToggle, settings.onToggle, wizard.onToggle, profiles.onToggle, syncViews.onToggle];
-const INPUT = [libraryInput, editor.onInput, wizard.onInput, profiles.onInput, syncViews.onInput];
+const INPUT = [libraryInput, editor.onInput, wizard.onInput, profiles.onInput, syncViews.onInput, activity.onInput];
 const CHANGE = [settings.onChange, wizard.onChange, profiles.onChange];
 
 /* ---------- Shell ---------- */

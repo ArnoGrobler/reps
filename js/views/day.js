@@ -9,6 +9,7 @@ import { countExercises, estimateSeconds, regenerateDay, FOCUS } from '../genera
 import { dayEditorView } from './editor.js';
 import { templatePickerView, evidenceTag } from './proven.js';
 import { TEMPLATE } from '../data/templates.js';
+import { activityDayHtml, openActivityPicker, removeActivity } from './activity.js';
 
 export function blockFormat(b) {
   if (b.pair) return `${b.rounds} set${b.rounds === 1 ? '' : 's'} · alternating`;
@@ -62,9 +63,10 @@ export function dayView(key) {
         return `<div class="card empty">${icon('calendar')}
           <div class="t-headline">Nothing planned</div>
           <p class="t-sub sec" style="margin:0">${s.plan ? 'This day is outside your current plan.' : 'Create a plan to schedule workouts.'}</p>
-          ${s.plan ? '' : '<button class="btn btn-filled" data-action="open-wizard">Create My Plan</button>'}
+          ${s.plan ? `<button class="btn btn-gray" data-action="day-activity" data-key="${key}">${icon('activity', 'sm')} ${key > todayKey() ? 'Plan an Activity' : 'Log an Activity'}</button>` : '<button class="btn btn-filled" data-action="open-wizard">Create My Plan</button>'}
         </div>`;
       }
+      if (day.type === 'activity') return activityDayHtml(key, day, s);
       if (day.type === 'rest') {
         return `<div class="card hero rest-card">
           <div class="rest-head"><div class="rest-icon">${icon('moon')}</div>
@@ -115,10 +117,10 @@ export function toggleDone(key, { quiet = false } = {}) {
   const prev = s.log[key];
   update((st) => {
     if (wasDone) st.log[key] = { completed: false, at: Date.now() };
-    else st.log[key] = { completed: true, at: Date.now(), mode: 'manual', durationSec: day?.type === 'workout' ? (day.estSec || 0) : 0 };
+    else st.log[key] = { completed: true, at: Date.now(), mode: day?.type === 'activity' ? 'activity' : 'manual', durationSec: day?.type === 'workout' ? (day.estSec || 0) : day?.type === 'activity' ? day.minutes * 60 : 0 };
   });
   if (quiet) return;
-  const what = day?.type === 'rest' ? 'Rest day' : 'Workout';
+  const what = day?.type === 'rest' ? 'Rest day' : day?.type === 'activity' ? day.title : 'Workout';
   toast(wasDone ? `${what} marked not done` : `${what} complete`, {
     iconName: wasDone ? 'undo-2' : 'circle-check',
     action: { label: 'Undo', onClick: () => update((st) => { st.log[key] = prev ? { ...prev, at: Date.now() } : { completed: false, at: Date.now() }; }) },
@@ -143,6 +145,7 @@ export async function setRestDay(key, rest) {
 
 export const actions = {
   'open-day': (el) => openDay(el.dataset.key),
+  'day-activity': (el) => openActivityPicker(el.dataset.key),
   'toggle-done': (el) => toggleDone(el.dataset.key),
   'edit-day': (el) => pushSheet(dayEditorView(el.dataset.key)),
   'day-menu': async (el) => {
@@ -151,6 +154,7 @@ export const actions = {
     const day = getDay(key, s);
     if (!day) return;
     const done = isDone(key, s);
+    const manual = { label: 'Change to Manual Activity', icon: 'activity', value: 'activity' };
     const items = day.type === 'workout'
       ? [
         { label: done ? 'Mark as Not Done' : 'Mark as Done', icon: done ? 'undo-2' : 'circle-check', value: 'done' },
@@ -158,14 +162,26 @@ export const actions = {
         { label: 'New Workout for This Day', icon: 'refresh-cw', value: 'regen' },
         { label: 'Use a Proven Workout', icon: 'book-open', value: 'proven' },
         { sep: true },
+        manual,
         { label: 'Change to Rest Day', icon: 'moon', value: 'rest' },
+      ]
+      : day.type === 'activity'
+      ? [
+        { label: done ? 'Mark as Not Done' : 'Mark as Done', icon: done ? 'undo-2' : 'circle-check', value: 'done' },
+        { label: 'Change Activity', icon: 'activity', value: 'activity' },
+        { sep: true },
+        ...(day.prev ? [{ label: day.prev.type === 'rest' ? 'Back to Rest Day' : 'Back to Planned Workout', icon: day.prev.type === 'rest' ? 'moon' : 'dumbbell', value: 'unactivity' }]
+          : [{ label: 'Remove Activity', icon: 'trash-2', value: 'unactivity', danger: true }]),
       ]
       : [
         { label: done ? 'Mark as Not Done' : 'Mark as Done', icon: done ? 'undo-2' : 'circle-check', value: 'done' },
         { label: 'Change to Workout Day', icon: 'dumbbell', value: 'workout' },
+        manual,
       ];
     const v = await showMenu(el, items);
     if (v === 'done') toggleDone(key);
+    else if (v === 'activity') openActivityPicker(key);
+    else if (v === 'unactivity') removeActivity(key);
     else if (v === 'edit') pushSheet(dayEditorView(key));
     else if (v === 'rest') setRestDay(key, true);
     else if (v === 'proven') pushSheet(templatePickerView(key));
